@@ -8,12 +8,10 @@ import com.vinhtt.PDFReader.viewmodel.MainViewModel;
 import com.vinhtt.PDFReader.util.ConfigLoader;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
-import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.FileChooser;
-import javafx.collections.ListChangeListener;
 
 import java.io.File;
 
@@ -21,6 +19,11 @@ public class MainController {
 
     @FXML private ScrollPane pdfContainer;
     @FXML private VBox pdfPageContainer;
+    @FXML private ImageView pdfImageView; // New Injection
+
+    @FXML private TextField pageInputField;
+    @FXML private Label totalPagesLabel;
+
     @FXML private ListView<Paragraph> paragraphListView;
     @FXML private ListView<Sentence> sentenceListView;
     @FXML private Label statusLabel;
@@ -31,34 +34,47 @@ public class MainController {
     public void initialize() {
         statusLabel.textProperty().bind(viewModel.statusMessageProperty());
 
-        viewModel.appFontSizeProperty().addListener((obs, oldVal, newVal) -> {
-            updateAppFontSize(newVal.intValue());
-        });
-
+        // Font Size Handler
+        viewModel.appFontSizeProperty().addListener((obs, oldVal, newVal) ->
+                updateAppFontSize(newVal.intValue()));
         pdfContainer.sceneProperty().addListener((obs, oldScene, newScene) -> {
-            if (newScene != null) {
-                updateAppFontSize(viewModel.appFontSizeProperty().get());
-            }
+            if (newScene != null) updateAppFontSize(viewModel.appFontSizeProperty().get());
         });
 
+        // --- List View Setup ---
         paragraphListView.setCellFactory(param -> new ParagraphTile(viewModel::translateParagraph));
-        paragraphListView.itemsProperty().bind(viewModel.paragraphListProperty());
+        // FIX: Bind vào visibleParagraphList thay vì paragraphList
+        paragraphListView.itemsProperty().bind(viewModel.visibleParagraphListProperty());
 
         sentenceListView.setCellFactory(param -> new SentenceTile(viewModel::analyzeSentence));
         sentenceListView.itemsProperty().bind(viewModel.sentenceListProperty());
 
+        // Selection Event
         paragraphListView.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
             viewModel.selectedParagraphProperty().set(newVal);
             if (newVal != null) viewModel.loadSentencesFor(newVal);
         });
 
-        viewModel.pdfPagesProperty().addListener((ListChangeListener<Image>) c -> {
-            pdfPageContainer.getChildren().clear();
-            for (Image img : c.getList()) {
-                ImageView imageView = new ImageView(img);
-                imageView.setPreserveRatio(true);
-                imageView.fitWidthProperty().bind(pdfContainer.widthProperty().subtract(20));
-                pdfPageContainer.getChildren().add(imageView);
+        // --- PDF Image Binding ---
+        // Bind Image View với property currentPdfPageImage
+        pdfImageView.imageProperty().bind(viewModel.currentPdfPageImageProperty());
+        // Bind chiều rộng ảnh để responsive
+        pdfImageView.fitWidthProperty().bind(pdfContainer.widthProperty().subtract(20));
+
+        // --- Pagination Binding ---
+        viewModel.totalPagesProperty().addListener((obs, oldVal, newVal) ->
+                totalPagesLabel.setText("/ " + newVal));
+
+        viewModel.currentPageProperty().addListener((obs, oldVal, newVal) ->
+                pageInputField.setText(String.valueOf(newVal.intValue() + 1))); // Hiển thị 1-based
+
+        // Xử lý nhập số trang
+        pageInputField.setOnAction(e -> {
+            try {
+                int page = Integer.parseInt(pageInputField.getText()) - 1;
+                viewModel.goToPage(page);
+            } catch (NumberFormatException ex) {
+                pageInputField.setText(String.valueOf(viewModel.currentPageProperty().get() + 1));
             }
         });
     }
@@ -68,6 +84,10 @@ public class MainController {
             pdfContainer.getScene().getRoot().setStyle("-fx-font-size: " + size + "px;");
         }
     }
+
+    // UI Actions
+    public void onPrevPage() { viewModel.prevPage(); }
+    public void onNextPage() { viewModel.nextPage(); }
 
     public void onOpenPdf() {
         FileChooser fileChooser = new FileChooser();
@@ -90,44 +110,26 @@ public class MainController {
 
         TextField apiKeyField = new TextField(ConfigLoader.getApiKey());
         apiKeyField.setPromptText("API Key");
-
         TextField modelField = new TextField(ConfigLoader.getGeminiModel());
         modelField.setPromptText("Model ID");
-
         TextArea promptArea = new TextArea(ConfigLoader.getTranslationPrompt());
-        promptArea.setPromptText("Custom Prompt...");
         promptArea.setPrefRowCount(3);
-
         TextArea analysisPromptArea = new TextArea(ConfigLoader.getAnalysisPrompt());
-        analysisPromptArea.setPromptText("Analysis Prompt...");
         analysisPromptArea.setPrefRowCount(3);
-
         Spinner<Integer> fontSizeSpinner = new Spinner<>(10, 30, ConfigLoader.getFontSize());
         fontSizeSpinner.setEditable(true);
 
-        grid.add(new Label("API Key:"), 0, 0);
-        grid.add(apiKeyField, 1, 0);
-        grid.add(new Label("Model:"), 0, 1);
-        grid.add(modelField, 1, 1);
-        grid.add(new Label("Trans Prompt:"), 0, 2);
-        grid.add(promptArea, 1, 2);
-        grid.add(new Label("Analysis Prompt:"), 0, 3);
-        grid.add(analysisPromptArea, 1, 3);
-        grid.add(new Label("Font Size:"), 0, 4);
-        grid.add(fontSizeSpinner, 1, 4);
+        grid.add(new Label("API Key:"), 0, 0); grid.add(apiKeyField, 1, 0);
+        grid.add(new Label("Model:"), 0, 1); grid.add(modelField, 1, 1);
+        grid.add(new Label("Trans Prompt:"), 0, 2); grid.add(promptArea, 1, 2);
+        grid.add(new Label("Analysis Prompt:"), 0, 3); grid.add(analysisPromptArea, 1, 3);
+        grid.add(new Label("Font Size:"), 0, 4); grid.add(fontSizeSpinner, 1, 4);
 
         dialog.getDialogPane().setContent(grid);
-
         dialog.setResultConverter(dialogButton -> {
             if (dialogButton == saveButtonType) {
                 int newSize = fontSizeSpinner.getValue();
-                ConfigLoader.saveSettings(
-                        apiKeyField.getText(),
-                        modelField.getText(),
-                        promptArea.getText(),
-                        analysisPromptArea.getText(),
-                        newSize
-                );
+                ConfigLoader.saveSettings(apiKeyField.getText(), modelField.getText(), promptArea.getText(), analysisPromptArea.getText(), newSize);
                 viewModel.setAppFontSize(newSize);
                 return saveButtonType;
             }

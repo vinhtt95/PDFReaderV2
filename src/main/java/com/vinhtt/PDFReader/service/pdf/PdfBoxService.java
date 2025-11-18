@@ -3,7 +3,7 @@ package com.vinhtt.PDFReader.service.pdf;
 import com.vinhtt.PDFReader.model.Paragraph;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
-import org.apache.pdfbox.rendering.PDFRenderer; // Cần import
+import org.apache.pdfbox.rendering.PDFRenderer;
 import org.apache.pdfbox.text.PDFTextStripper;
 import org.apache.pdfbox.text.TextPosition;
 
@@ -34,7 +34,7 @@ public class PdfBoxService implements IPdfService {
         try (PDDocument document = Loader.loadPDF(file)) {
             PDFRenderer renderer = new PDFRenderer(document);
             for (int i = 0; i < document.getNumberOfPages(); i++) {
-                // Scale 1.5f ~ 108 DPI (Good for reading)
+                // Scale 1.5f ~ 108 DPI
                 images.add(renderer.renderImage(i, 1.5f));
             }
         }
@@ -46,7 +46,6 @@ public class PdfBoxService implements IPdfService {
         return file.getName() + "_" + file.length();
     }
 
-    // Inner class CustomPDFTextStripper (giữ nguyên như cũ)
     private static class CustomPDFTextStripper extends PDFTextStripper {
         private final List<Paragraph> outputList;
         private StringBuilder currentParagraph = new StringBuilder();
@@ -61,6 +60,8 @@ public class PdfBoxService implements IPdfService {
         protected void writeString(String text, List<TextPosition> textPositions) throws IOException {
             if (textPositions.isEmpty()) return;
             float y = textPositions.get(0).getY();
+
+            // Logic ghép đoạn văn
             if (Math.abs(y - currentY) > 20 && currentParagraph.length() > 0) {
                 saveParagraph();
             }
@@ -71,7 +72,9 @@ public class PdfBoxService implements IPdfService {
         private void saveParagraph() {
             String text = currentParagraph.toString().trim();
             if (!text.isEmpty()) {
-                outputList.add(new Paragraph(idCounter++, text, currentY));
+                // Lấy Page Index hiện tại (PDFBox tính từ 1, ta trừ 1 để ra index 0-based)
+                int pageIndex = getCurrentPageNo() - 1;
+                outputList.add(new Paragraph(idCounter++, pageIndex, text, currentY));
             }
             currentParagraph.setLength(0);
         }
@@ -79,7 +82,7 @@ public class PdfBoxService implements IPdfService {
         @Override
         protected void writePage() throws IOException {
             super.writePage();
-            saveParagraph();
+            saveParagraph(); // Lưu đoạn cuối cùng của trang
         }
     }
 }

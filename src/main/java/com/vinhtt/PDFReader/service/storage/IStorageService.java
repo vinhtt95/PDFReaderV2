@@ -17,4 +17,7 @@ public interface IStorageService {
     List<Sentence> getSentencesByParagraphId(int paragraphId);
     void saveSentences(List<Sentence> sentences);
     void updateSentenceAnalysis(int id, String analysisJson);
+
+    // Thêm phương thức này để khớp với override bên SqliteStorageService
+    void close();
 }
