@@ -16,17 +16,16 @@ public class SentenceTile extends ListCell<Sentence> {
     private final VBox root = new VBox(8);
     private final Button analyzeBtn = new Button("Analyze Grammar");
     private final Button vocabBtn = new Button("Dictionary");
-    private final HBox footer = new HBox(10); // Footer chứa các nút
+    private final HBox footer = new HBox(10);
     private final Consumer<Sentence> onAnalyzeAction;
 
     public SentenceTile(Consumer<Sentence> onAnalyzeAction) {
         this.onAnalyzeAction = onAnalyzeAction;
 
-        // 1. Layout
         root.setPadding(new Insets(10));
         root.getStyleClass().add("card-view");
 
-        // 2. Buttons Styling
+        // Buttons Styling
         analyzeBtn.getStyleClass().add("button-action");
         vocabBtn.getStyleClass().add("button-action");
 
@@ -38,7 +37,6 @@ public class SentenceTile extends ListCell<Sentence> {
             }
         });
 
-        // 3. Setup Footer (Căn góc dưới phải)
         footer.setAlignment(Pos.BOTTOM_RIGHT);
         footer.setPadding(new Insets(5, 0, 0, 0));
     }
@@ -51,27 +49,25 @@ public class SentenceTile extends ListCell<Sentence> {
             setGraphic(null);
             root.prefWidthProperty().unbind();
         } else {
-            // FIX LỖI CHIỀU CAO: Bind vào ListView cha
+            // Binding width fix
             if (getListView() != null) {
-                root.prefWidthProperty().bind(getListView().widthProperty().subtract(35));
+                root.prefWidthProperty().bind(getListView().widthProperty().subtract(45));
                 root.setMaxWidth(Region.USE_PREF_SIZE);
             }
 
             root.getChildren().clear();
 
-            // 1. Original Sentence
+            // 1. Sentence
             root.getChildren().add(createCollapsibleSection("Sentence", item.getOriginal(), "text-english", true));
 
-            // 2. Analysis Result
+            // 2. Analysis
             if (item.getAnalysis() != null && !item.getAnalysis().isEmpty()) {
                 root.getChildren().add(createCollapsibleSection("Grammar Analysis", item.getAnalysis(), "text-vietnamese", true));
-                // Đã phân tích xong -> Có thể ẩn nút hoặc hiện kết quả khác
             } else {
-                // Chưa phân tích -> Hiện nút ở Footer
+                // Toolbar
                 footer.getChildren().clear();
                 analyzeBtn.setText("Analyze Grammar");
                 analyzeBtn.setDisable(false);
-
                 footer.getChildren().addAll(analyzeBtn, vocabBtn);
                 root.getChildren().add(footer);
             }
@@ -90,7 +86,6 @@ public class SentenceTile extends ListCell<Sentence> {
         content.getStyleClass().add(cssClass);
         content.setWrapText(true);
 
-        // Bind width
         content.prefWidthProperty().bind(root.widthProperty());
         content.setMaxWidth(Region.USE_PREF_SIZE);
         content.setMinHeight(Region.USE_PREF_SIZE);

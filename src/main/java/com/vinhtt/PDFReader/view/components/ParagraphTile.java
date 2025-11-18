@@ -7,20 +7,17 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 
 import java.util.function.Consumer;
 
 public class ParagraphTile extends ListCell<Paragraph> {
-    private final VBox root = new VBox(8); // Tăng khoảng cách spacer một chút
+    private final VBox root = new VBox(8);
     private final Button translateBtn = new Button("Translate Paragraph");
-    private final HBox footer = new HBox(translateBtn); // Footer chứa nút
+    private final HBox footer = new HBox(translateBtn);
     private final Consumer<Paragraph> onTranslateAction;
-
-    // Containers cho các section
-    private VBox originalSection;
-    private VBox translatedSection;
 
     public ParagraphTile(Consumer<Paragraph> onTranslateAction) {
         this.onTranslateAction = onTranslateAction;
@@ -29,9 +26,7 @@ public class ParagraphTile extends ListCell<Paragraph> {
         root.setPadding(new Insets(15));
         root.getStyleClass().add("card-view");
 
-        // Lưu ý: Không bind width ở constructor nữa để tránh lỗi chiều cao
-
-        // 2. Setup Footer (Nút ở góc dưới phải)
+        // 2. Footer Setup
         translateBtn.getStyleClass().add("button-action");
         translateBtn.setOnAction(e -> {
             if (getItem() != null) {
@@ -41,8 +36,8 @@ public class ParagraphTile extends ListCell<Paragraph> {
             }
         });
 
-        footer.setAlignment(Pos.BOTTOM_RIGHT); // Căn phải
-        footer.setPadding(new Insets(5, 0, 0, 0)); // Cách biệt với nội dung trên
+        footer.setAlignment(Pos.BOTTOM_RIGHT);
+        footer.setPadding(new Insets(5, 0, 0, 0));
     }
 
     @Override
@@ -52,31 +47,26 @@ public class ParagraphTile extends ListCell<Paragraph> {
         if (empty || item == null) {
             setGraphic(null);
             setText(null);
-            // Gỡ bind để tránh leak memory
+            // Unbind để tránh leak khi cell rỗng
             root.prefWidthProperty().unbind();
         } else {
-            // FIX LỖI CHIỀU CAO LỚN: Bind trực tiếp vào ListView cha
+            // BINDING CHIỀU RỘNG CHUẨN
+            // Trừ đi khoảng 45px (padding trái/phải của ListView + scrollbar)
             if (getListView() != null) {
-                // Trừ 40px: 15px padding trái + 15px padding phải + 10px scrollbar dư
-                root.prefWidthProperty().bind(getListView().widthProperty().subtract(40));
+                root.prefWidthProperty().bind(getListView().widthProperty().subtract(45));
                 root.setMaxWidth(Region.USE_PREF_SIZE);
             }
 
             root.getChildren().clear();
 
-            // 1. Original Text Section
-            originalSection = createCollapsibleSection("Original", item.getOriginalText(), "text-english", true);
-            root.getChildren().add(originalSection);
+            // 1. Original
+            root.getChildren().add(createCollapsibleSection("Original", item.getOriginalText(), "text-english", true));
 
-            // 2. Translated Text Section (Nếu có)
+            // 2. Translated (nếu có)
             if (item.getTranslatedText() != null && !item.getTranslatedText().isEmpty()) {
-                translatedSection = createCollapsibleSection("Translation", item.getTranslatedText(), "text-vietnamese", true);
-                root.getChildren().add(translatedSection);
-
-                // Đã dịch xong -> Ẩn nút Translate (hoặc đổi thành Re-translate tuỳ logic)
-                // Ở đây tôi ẩn đi để giao diện sạch
+                root.getChildren().add(createCollapsibleSection("Translation", item.getTranslatedText(), "text-vietnamese", true));
             } else {
-                // Chưa dịch -> Hiện nút Translate ở dưới cùng
+                // Nếu chưa dịch -> Hiện nút Translate
                 translateBtn.setText("Translate Paragraph");
                 translateBtn.setDisable(false);
                 root.getChildren().add(footer);
@@ -89,20 +79,19 @@ public class ParagraphTile extends ListCell<Paragraph> {
     private VBox createCollapsibleSection(String title, String text, String cssClass, boolean isExpanded) {
         VBox section = new VBox(4);
 
-        // Header
         Label header = new Label((isExpanded ? "▼ " : "▶ ") + title);
         header.getStyleClass().add("section-header");
         header.setMaxWidth(Double.MAX_VALUE);
 
-        // Content
         Label content = new Label(text);
         content.getStyleClass().add(cssClass);
         content.setWrapText(true);
 
-        // Bind width của Label theo Root để wrap text đúng
+        // BINDING CONTENT WIDTH THEO ROOT
+        // Quan trọng: minHeight phải là USE_PREF_SIZE để wrap text hoạt động đúng
         content.prefWidthProperty().bind(root.widthProperty());
         content.setMaxWidth(Region.USE_PREF_SIZE);
-        content.setMinHeight(Region.USE_PREF_SIZE); // Bắt buộc để tính toán chiều cao
+        content.setMinHeight(Region.USE_PREF_SIZE);
 
         content.setManaged(isExpanded);
         content.setVisible(isExpanded);
