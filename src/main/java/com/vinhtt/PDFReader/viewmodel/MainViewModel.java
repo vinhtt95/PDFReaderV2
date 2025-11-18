@@ -1,13 +1,14 @@
 package com.vinhtt.PDFReader.viewmodel;
 
 import com.vinhtt.PDFReader.model.Paragraph;
-import com.vinhtt.PDFReader.model.Sentence; // Nhớ import
+import com.vinhtt.PDFReader.model.Sentence;
 import com.vinhtt.PDFReader.service.api.GeminiService;
 import com.vinhtt.PDFReader.service.api.ITranslationService;
 import com.vinhtt.PDFReader.service.pdf.IPdfService;
 import com.vinhtt.PDFReader.service.pdf.PdfBoxService;
 import com.vinhtt.PDFReader.service.storage.IStorageService;
 import com.vinhtt.PDFReader.service.storage.SqliteStorageService;
+import com.vinhtt.PDFReader.util.ConfigLoader;
 import javafx.application.Platform;
 import javafx.beans.property.*;
 import javafx.collections.FXCollections;
@@ -18,7 +19,7 @@ import javafx.scene.image.Image;
 
 import java.awt.image.BufferedImage;
 import java.io.File;
-import java.text.BreakIterator; // Để tách câu
+import java.text.BreakIterator;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -26,11 +27,13 @@ import java.util.Locale;
 public class MainViewModel {
     private final ListProperty<Paragraph> paragraphList = new SimpleListProperty<>(FXCollections.observableArrayList());
     private final ListProperty<Image> pdfPages = new SimpleListProperty<>(FXCollections.observableArrayList());
-    // Property mới: Danh sách câu cho cột phải
     private final ListProperty<Sentence> sentenceList = new SimpleListProperty<>(FXCollections.observableArrayList());
 
     private final ObjectProperty<Paragraph> selectedParagraph = new SimpleObjectProperty<>();
     private final StringProperty statusMessage = new SimpleStringProperty("Ready");
+
+    // New Property for Font Size
+    private final IntegerProperty appFontSize = new SimpleIntegerProperty(ConfigLoader.getFontSize());
 
     private final IPdfService pdfService;
     private final ITranslationService translationService;
@@ -42,7 +45,10 @@ public class MainViewModel {
         this.storageService = new SqliteStorageService();
     }
 
-    // ... (Giữ nguyên hàm loadPdf)
+    // ... (Giữ nguyên các hàm loadPdf, translateParagraph, loadSentencesFor, analyzeSentence cũ)
+    // Để tiết kiệm không gian, tôi không paste lại các hàm logic nghiệp vụ chưa đổi.
+    // Bạn giữ nguyên logic loadPdf, translateParagraph, loadSentencesFor, analyzeSentence ở đây.
+
     public void loadPdf(File file) {
         statusMessage.set("Analyzing PDF & Rendering...");
         Task<Void> task = new Task<>() {
@@ -86,18 +92,15 @@ public class MainViewModel {
                 });
     }
 
-    // Logic mới: Tách câu
     public void loadSentencesFor(Paragraph p) {
         if (p == null) {
             sentenceList.clear();
             return;
         }
-
         List<Sentence> sentences = new ArrayList<>();
         BreakIterator iterator = BreakIterator.getSentenceInstance(Locale.US);
         String text = p.getOriginalText();
         iterator.setText(text);
-
         int start = iterator.first();
         for (int end = iterator.next(); end != BreakIterator.DONE; start = end, end = iterator.next()) {
             String sentenceText = text.substring(start, end).trim();
@@ -108,13 +111,11 @@ public class MainViewModel {
         sentenceList.setAll(sentences);
     }
 
-    // Logic mới: Phân tích ngữ pháp câu
     public void analyzeSentence(Sentence s) {
         statusMessage.set("Analyzing grammar...");
         translationService.analyze(s.getOriginal())
                 .thenAccept(result -> Platform.runLater(() -> {
                     s.setAnalysis(result);
-                    // Trigger update ListView
                     int index = sentenceList.indexOf(s);
                     if (index >= 0) sentenceList.set(index, s);
                     statusMessage.set("Analysis complete.");
@@ -125,15 +126,16 @@ public class MainViewModel {
                 });
     }
 
-    // Getters
+    // Getters & Property Accessors
     public ObservableList<Paragraph> getParagraphList() { return paragraphList.get(); }
     public ListProperty<Paragraph> paragraphListProperty() { return paragraphList; }
     public ObservableList<Image> getPdfPages() { return pdfPages.get(); }
     public ListProperty<Image> pdfPagesProperty() { return pdfPages; }
-
     public ObservableList<Sentence> getSentenceList() { return sentenceList.get(); }
     public ListProperty<Sentence> sentenceListProperty() { return sentenceList; }
-
     public ObjectProperty<Paragraph> selectedParagraphProperty() { return selectedParagraph; }
     public StringProperty statusMessageProperty() { return statusMessage; }
+
+    public IntegerProperty appFontSizeProperty() { return appFontSize; }
+    public void setAppFontSize(int size) { this.appFontSize.set(size); }
 }

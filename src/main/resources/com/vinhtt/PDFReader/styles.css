@@ -118,3 +118,24 @@
     -fx-border-width: 1px 0 0 0;
     -fx-min-height: 1px;
 }
+
+/* ... (Giữ nguyên các phần cũ) ... */
+
+/* Collapsible Section Headers */
+.section-header {
+    -fx-text-fill: -color-accent;
+    -fx-font-weight: bold;
+    -fx-font-size: 1em; /* Relative to global font size */
+    -fx-cursor: hand;
+    -fx-padding: 5px 0;
+    -fx-border-color: -color-border;
+    -fx-border-width: 0 0 1px 0;
+}
+
+.section-header:hover {
+    -fx-text-fill: -color-accent-hover;
+}
+
+.section-content {
+    -fx-padding: 5px 0 10px 0;
+}
