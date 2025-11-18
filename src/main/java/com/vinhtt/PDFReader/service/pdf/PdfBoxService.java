@@ -1,8 +1,10 @@
+// File: src/main/java/com/vinhtt/PDFReader/service/pdf/PdfBoxService.java
 package com.vinhtt.PDFReader.service.pdf;
 
 import com.vinhtt.PDFReader.model.Paragraph;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.rendering.ImageType;
 import org.apache.pdfbox.rendering.PDFRenderer;
 import org.apache.pdfbox.text.PDFTextStripper;
 import org.apache.pdfbox.text.TextPosition;
@@ -17,6 +19,7 @@ public class PdfBoxService implements IPdfService {
 
     @Override
     public List<Paragraph> parsePdf(File file) throws Exception {
+        // ... (Giữ nguyên code parse text cũ của bạn ở đây)
         List<Paragraph> paragraphs = new ArrayList<>();
         try (PDDocument document = Loader.loadPDF(file)) {
             CustomPDFTextStripper stripper = new CustomPDFTextStripper(paragraphs);
@@ -29,16 +32,17 @@ public class PdfBoxService implements IPdfService {
     }
 
     @Override
-    public List<BufferedImage> renderPdfPages(File file) throws Exception {
-        List<BufferedImage> images = new ArrayList<>();
-        try (PDDocument document = Loader.loadPDF(file)) {
-            PDFRenderer renderer = new PDFRenderer(document);
-            for (int i = 0; i < document.getNumberOfPages(); i++) {
-                // Scale 1.5f ~ 108 DPI
-                images.add(renderer.renderImage(i, 1.5f));
-            }
-        }
-        return images;
+    public PDDocument loadDocument(File file) throws Exception {
+        // Mở file PDF và trả về đối tượng document để ViewModel quản lý vòng đời
+        return Loader.loadPDF(file);
+    }
+
+    @Override
+    public BufferedImage renderPage(PDDocument document, int pageIndex, float scale) throws Exception {
+        PDFRenderer renderer = new PDFRenderer(document);
+        // Scale 3.0f ~ 216 DPI (Rất nét trên màn hình Retina/HiDPI)
+        // ImageType.RGB giúp giảm dung lượng bộ nhớ so với ARGB nếu không cần trong suốt
+        return renderer.renderImage(pageIndex, scale, ImageType.RGB);
     }
 
     @Override
@@ -46,6 +50,7 @@ public class PdfBoxService implements IPdfService {
         return file.getName() + "_" + file.length();
     }
 
+    // ... (Giữ nguyên class CustomPDFTextStripper cũ của bạn)
     private static class CustomPDFTextStripper extends PDFTextStripper {
         private final List<Paragraph> outputList;
         private StringBuilder currentParagraph = new StringBuilder();

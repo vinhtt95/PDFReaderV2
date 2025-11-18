@@ -16,13 +16,14 @@ import javafx.collections.ObservableList;
 import javafx.concurrent.Task;
 import javafx.embed.swing.SwingFXUtils;
 import javafx.scene.image.Image;
+import org.apache.pdfbox.pdmodel.PDDocument;
 
 import java.awt.image.BufferedImage;
 import java.io.File;
+import java.io.IOException;
 import java.text.BreakIterator;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Locale;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 /**
@@ -31,7 +32,11 @@ import java.util.stream.Collectors;
 public class MainViewModel {
 
     private final List<Paragraph> allParagraphs = new ArrayList<>();
-    private final List<Image> allPdfImages = new ArrayList<>();
+    // Thay vì List<Image>, ta giữ PDDocument để render theo yêu cầu
+    private PDDocument currentDocument;
+
+    // Cache hình ảnh (LRU Cache đơn giản: giữ lại 5 trang gần nhất để lướt cho mượt)
+    private final Map<Integer, Image> pageCache = new ConcurrentHashMap<>();
 
     private final ListProperty<Paragraph> visibleParagraphList = new SimpleListProperty<>(FXCollections.observableArrayList());
     private final ObjectProperty<Image> currentPdfPageImage = new SimpleObjectProperty<>();
@@ -48,6 +53,9 @@ public class MainViewModel {
     private final ITranslationService translationService;
     private final IStorageService storageService;
 
+    // Cấu hình Render chất lượng cao
+    private static final float HIGH_QUALITY_SCALE = 3.0f; // Tương đương ~216 DPI
+
     /**
      * Khởi tạo ViewModel và các service đi kèm.
      */
@@ -56,24 +64,137 @@ public class MainViewModel {
         this.translationService = new GeminiService();
         this.storageService = new SqliteStorageService();
 
-        currentPage.addListener((obs, oldVal, newVal) -> updateCurrentPageView());
+        currentPage.addListener((obs, oldVal, newVal) -> {
+            updateCurrentPageView();
+            // Pre-load trang tiếp theo để trải nghiệm mượt hơn
+            preloadPage(newVal.intValue() + 1);
+        });
     }
 
-    /**
-     * Cập nhật dữ liệu hiển thị khi người dùng chuyển trang.
-     */
     private void updateCurrentPageView() {
         int page = currentPage.get();
-        if (page >= 0 && page < allPdfImages.size()) {
-            currentPdfPageImage.set(allPdfImages.get(page));
+        if (currentDocument == null || page < 0 || page >= totalPages.get()) return;
 
-            List<Paragraph> pageParagraphs = allParagraphs.stream()
-                    .filter(p -> p.getPageIndex() == page)
-                    .collect(Collectors.toList());
-            visibleParagraphList.setAll(pageParagraphs);
+        // 1. Cập nhật Paragraph List (Text) ngay lập tức
+        List<Paragraph> pageParagraphs = allParagraphs.stream()
+                .filter(p -> p.getPageIndex() == page)
+                .collect(Collectors.toList());
+        visibleParagraphList.setAll(pageParagraphs);
+        selectedParagraph.set(null);
+        sentenceList.clear();
 
-            selectedParagraph.set(null);
-            sentenceList.clear();
+        // 2. Cập nhật Image (Async)
+        if (pageCache.containsKey(page)) {
+            currentPdfPageImage.set(pageCache.get(page));
+        } else {
+            // Nếu chưa có trong cache, hiển thị loading hoặc giữ ảnh cũ và chạy task render
+            statusMessage.set("Rendering HQ Page " + (page + 1) + "...");
+            renderPageAsync(page);
+        }
+    }
+
+    private void renderPageAsync(int pageIndex) {
+        Task<Image> renderTask = new Task<>() {
+            @Override
+            protected Image call() throws Exception {
+                // Render High Quality
+                BufferedImage bi = pdfService.renderPage(currentDocument, pageIndex, HIGH_QUALITY_SCALE);
+                return SwingFXUtils.toFXImage(bi, null);
+            }
+        };
+
+        renderTask.setOnSucceeded(e -> {
+            Image img = renderTask.getValue();
+            pageCache.put(pageIndex, img);
+            // Xóa cache cũ nếu quá lớn (giữ 5 trang)
+            if (pageCache.size() > 5) {
+                int furthestPage = pageCache.keySet().stream()
+                        .max(Comparator.comparingInt(p -> Math.abs(p - pageIndex)))
+                        .orElse(pageIndex);
+                if (furthestPage != pageIndex) pageCache.remove(furthestPage);
+            }
+
+            // Chỉ update nếu user vẫn đang ở trang đó
+            if (currentPage.get() == pageIndex) {
+                currentPdfPageImage.set(img);
+                statusMessage.set("Ready");
+            }
+        });
+
+        renderTask.setOnFailed(e -> {
+            statusMessage.set("Render Error: " + renderTask.getException().getMessage());
+            renderTask.getException().printStackTrace();
+        });
+
+        new Thread(renderTask).start();
+    }
+
+    private void preloadPage(int pageIndex) {
+        if (pageIndex < totalPages.get() && !pageCache.containsKey(pageIndex)) {
+            renderPageAsync(pageIndex); // Chạy ngầm
+        }
+    }
+
+    // --- Load PDF Logic ---
+    public void loadPdf(File file) {
+        // Đóng document cũ nếu có
+        closeCurrentDocument();
+
+        statusMessage.set("Initializing...");
+        Task<Void> task = new Task<>() {
+            @Override
+            protected Void call() throws Exception {
+                String dbPath = file.getParent() + File.separator + file.getName() + ".meta.db";
+                storageService.initDatabase(dbPath);
+
+                // 1. Load PDF Document (Giữ handle file)
+                updateMessage("Opening PDF...");
+                currentDocument = pdfService.loadDocument(file);
+
+                Platform.runLater(() -> {
+                    totalPages.set(currentDocument.getNumberOfPages());
+                    pageCache.clear();
+                });
+
+                // 2. Parse Text / Load from DB
+                if (storageService.hasData()) {
+                    updateMessage("Loading Data...");
+                    allParagraphs.clear();
+                    allParagraphs.addAll(storageService.getAllParagraphs());
+                } else {
+                    updateMessage("Parsing Text...");
+                    List<Paragraph> parsed = pdfService.parsePdf(file);
+                    storageService.saveParagraphs(parsed);
+                    allParagraphs.clear();
+                    allParagraphs.addAll(parsed);
+                }
+
+                // 3. Render trang đầu tiên
+                Platform.runLater(() -> {
+                    currentPage.set(0);
+                    updateCurrentPageView();
+                    statusMessage.set("Loaded: " + file.getName());
+                });
+                return null;
+            }
+        };
+
+        task.messageProperty().addListener((obs, old, msg) -> statusMessage.set(msg));
+
+        Thread t = new Thread(task);
+        t.setDaemon(true);
+        t.start();
+    }
+
+    public void closeCurrentDocument() {
+        if (currentDocument != null) {
+            try {
+                currentDocument.close();
+                currentDocument = null;
+                pageCache.clear();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
     }
 
@@ -106,63 +227,12 @@ public class MainViewModel {
     }
 
     /**
-     * Tải file PDF, render hình ảnh và parse text.
-     * @param file file PDF đầu vào
-     */
-    public void loadPdf(File file) {
-        statusMessage.set("Initializing...");
-        Task<Void> task = new Task<>() {
-            @Override
-            protected Void call() throws Exception {
-                String dbPath = file.getParent() + File.separator + file.getName() + ".meta.db";
-                storageService.initDatabase(dbPath);
-
-                updateMessage("Rendering PDF Pages...");
-                List<BufferedImage> bufferedImages = pdfService.renderPdfPages(file);
-                allPdfImages.clear();
-                for (BufferedImage bi : bufferedImages) {
-                    allPdfImages.add(SwingFXUtils.toFXImage(bi, null));
-                }
-
-                if (storageService.hasData()) {
-                    updateMessage("Loading Data...");
-                    allParagraphs.clear();
-                    allParagraphs.addAll(storageService.getAllParagraphs());
-                } else {
-                    updateMessage("Parsing PDF Text...");
-                    List<Paragraph> parsed = pdfService.parsePdf(file);
-                    storageService.saveParagraphs(parsed);
-                    allParagraphs.clear();
-                    allParagraphs.addAll(parsed);
-                }
-
-                Platform.runLater(() -> {
-                    totalPages.set(allPdfImages.size());
-                    currentPage.set(0);
-                    updateCurrentPageView();
-                    statusMessage.set("Loaded: " + file.getName());
-                });
-                return null;
-            }
-        };
-
-        task.messageProperty().addListener((obs, old, msg) -> statusMessage.set(msg));
-        task.setOnFailed(e -> {
-            statusMessage.set("Error: " + task.getException().getMessage());
-            task.getException().printStackTrace();
-        });
-
-        Thread t = new Thread(task);
-        t.setDaemon(true);
-        t.start();
-    }
-
-    /**
      * Dịch đoạn văn bản được chọn.
      * Hàm này cho phép gọi lại để dịch lại (Re-translate) đè lên nội dung cũ.
      * @param p Đoạn văn cần dịch
      */
     public void translateParagraph(Paragraph p) {
+        if (p.getTranslatedText() != null && !p.getTranslatedText().isEmpty()) return;
         statusMessage.set("Translating...");
         translationService.translate(p.getOriginalText())
                 .thenAccept(translated -> {
@@ -176,16 +246,11 @@ public class MainViewModel {
                 });
     }
 
-    /**
-     * Tách câu cho đoạn văn được chọn và load dữ liệu từ DB nếu có.
-     * @param p Đoạn văn được chọn
-     */
     public void loadSentencesFor(Paragraph p) {
         if (p == null) {
             sentenceList.clear();
             return;
         }
-
         Task<List<Sentence>> task = new Task<>() {
             @Override
             protected List<Sentence> call() throws Exception {
