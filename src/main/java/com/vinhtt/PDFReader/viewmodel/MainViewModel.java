@@ -44,7 +44,8 @@ public class MainViewModel {
     private final ListProperty<Sentence> sentenceList = new SimpleListProperty<>(FXCollections.observableArrayList());
     private final ObjectProperty<Paragraph> selectedParagraph = new SimpleObjectProperty<>();
 
-    private final IntegerProperty currentPage = new SimpleIntegerProperty(0);
+    // FIX: Khởi tạo là -1 để khi set(0) lúc load file sẽ kích hoạt sự kiện change listener
+    private final IntegerProperty currentPage = new SimpleIntegerProperty(-1);
     private final IntegerProperty totalPages = new SimpleIntegerProperty(0);
     private final StringProperty statusMessage = new SimpleStringProperty("Ready");
     private final IntegerProperty appFontSize = new SimpleIntegerProperty(ConfigLoader.getFontSize());
@@ -54,7 +55,7 @@ public class MainViewModel {
     private final IStorageService storageService;
 
     // Cấu hình Render chất lượng cao
-    private static final float HIGH_QUALITY_SCALE = 1.0f; // Tương đương ~216 DPI
+    private static final float HIGH_QUALITY_SCALE = 3.0f; // Tương đương ~216 DPI
 
     /**
      * Khởi tạo ViewModel và các service đi kèm.
@@ -73,6 +74,7 @@ public class MainViewModel {
 
     private void updateCurrentPageView() {
         int page = currentPage.get();
+        // Thêm kiểm tra page < 0 để tránh lỗi khi chưa load file
         if (currentDocument == null || page < 0 || page >= totalPages.get()) return;
 
         // 1. Cập nhật Paragraph List (Text) ngay lập tức
@@ -171,7 +173,7 @@ public class MainViewModel {
 
                 // 3. Render trang đầu tiên
                 Platform.runLater(() -> {
-                    currentPage.set(0);
+                    currentPage.set(0); // Lúc này sẽ kích hoạt ChangeListener vì -1 -> 0
                     updateCurrentPageView();
                     statusMessage.set("Loaded: " + file.getName());
                 });
