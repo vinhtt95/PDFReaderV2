@@ -49,11 +49,9 @@ public class MainViewModel {
         Task<Void> task = new Task<>() {
             @Override
             protected Void call() throws Exception {
-                // 1. Init DB
                 String dbPath = file.getParent() + File.separator + file.getName() + ".meta.db";
                 storageService.initDatabase(dbPath);
 
-                // 2. Render PDF Pages (Always render for visuals)
                 List<BufferedImage> bufferedImages = pdfService.renderPdfPages(file);
                 List<Image> fxImages = new ArrayList<>();
                 for (BufferedImage bi : bufferedImages) {
@@ -61,7 +59,6 @@ public class MainViewModel {
                 }
                 Platform.runLater(() -> pdfPages.setAll(fxImages));
 
-                // 3. Check Cache or Parse
                 if (storageService.hasData()) {
                     updateMessage("Loading from Cache...");
                     List<Paragraph> cachedParagraphs = storageService.getAllParagraphs();
@@ -69,7 +66,7 @@ public class MainViewModel {
                 } else {
                     updateMessage("Parsing PDF...");
                     List<Paragraph> paragraphs = pdfService.parsePdf(file);
-                    storageService.saveParagraphs(paragraphs); // Save to DB first
+                    storageService.saveParagraphs(paragraphs);
                     Platform.runLater(() -> paragraphList.setAll(paragraphs));
                 }
                 return null;
@@ -77,30 +74,28 @@ public class MainViewModel {
         };
 
         task.messageProperty().addListener((obs, old, msg) -> statusMessage.set(msg));
-
         task.setOnSucceeded(e -> statusMessage.set("File loaded: " + file.getName()));
         task.setOnFailed(e -> {
             statusMessage.set("Error: " + task.getException().getMessage());
             task.getException().printStackTrace();
         });
 
-        new Thread(task).start();
+        // FIX: Daemon thread để app đóng được
+        Thread thread = new Thread(task);
+        thread.setDaemon(true);
+        thread.start();
     }
 
     public void translateParagraph(Paragraph p) {
-        // Nếu đã có bản dịch rồi thì không gọi API lại (logic ở UI có thể chặn, nhưng thêm check ở đây cho chắc)
         if (p.getTranslatedText() != null && !p.getTranslatedText().isEmpty()) return;
 
-        statusMessage.set("Translating ID " + p.hashCode() + "...");
+        statusMessage.set("Translating ID " + p.getId() + "...");
         translationService.translate(p.getOriginalText())
                 .thenAccept(translated -> {
-                    // 1. Update DB
-                    storageService.updateParagraphTranslation(p.hashCode(), translated);
-
-                    // 2. Update UI
+                    // FIX: Dùng p.getId() thay vì p.hashCode()
+                    storageService.updateParagraphTranslation(p.getId(), translated);
                     Platform.runLater(() -> {
                         p.setTranslatedText(translated);
-                        // Trick to refresh ListView item
                         int index = paragraphList.indexOf(p);
                         if (index >= 0) paragraphList.set(index, p);
                         statusMessage.set("Translation saved.");
@@ -118,18 +113,16 @@ public class MainViewModel {
             return;
         }
 
-        // Chạy task ngầm để load/split sentences
         Task<List<Sentence>> task = new Task<>() {
             @Override
             protected List<Sentence> call() throws Exception {
-                // 1. Thử load từ DB trước
-                List<Sentence> dbSentences = storageService.getSentencesByParagraphId(p.hashCode());
+                // FIX: Dùng p.getId()
+                List<Sentence> dbSentences = storageService.getSentencesByParagraphId(p.getId());
 
                 if (!dbSentences.isEmpty()) {
                     return dbSentences;
                 }
 
-                // 2. Nếu chưa có trong DB, thực hiện tách câu
                 List<Sentence> newSentences = new ArrayList<>();
                 BreakIterator iterator = BreakIterator.getSentenceInstance(Locale.US);
                 String text = p.getOriginalText();
@@ -138,24 +131,25 @@ public class MainViewModel {
                 for (int end = iterator.next(); end != BreakIterator.DONE; start = end, end = iterator.next()) {
                     String sentenceText = text.substring(start, end).trim();
                     if (!sentenceText.isEmpty()) {
-                        // Tạo Sentence mới liên kết với ID của Paragraph
-                        newSentences.add(new Sentence(p.hashCode(), sentenceText, null));
+                        // FIX: Liên kết với p.getId()
+                        newSentences.add(new Sentence(p.getId(), sentenceText, null));
                     }
                 }
 
-                // 3. Lưu ngay vào DB để lấy ID tự sinh (nếu cần) và cache cho lần sau
                 if (!newSentences.isEmpty()) {
                     storageService.saveSentences(newSentences);
-                    // Load lại từ DB để đảm bảo có ID chuẩn (nếu dùng AUTOINCREMENT)
-                    return storageService.getSentencesByParagraphId(p.hashCode());
+                    return storageService.getSentencesByParagraphId(p.getId());
                 }
-
                 return new ArrayList<>();
             }
         };
 
         task.setOnSucceeded(e -> sentenceList.setAll(task.getValue()));
-        new Thread(task).start();
+
+        // FIX: Daemon thread
+        Thread thread = new Thread(task);
+        thread.setDaemon(true);
+        thread.start();
     }
 
     public void analyzeSentence(Sentence s) {
@@ -164,10 +158,7 @@ public class MainViewModel {
         statusMessage.set("Analyzing grammar...");
         translationService.analyze(s.getOriginal())
                 .thenAccept(result -> {
-                    // 1. Update DB
                     storageService.updateSentenceAnalysis(s.getId(), result);
-
-                    // 2. Update UI
                     Platform.runLater(() -> {
                         s.setAnalysis(result);
                         int index = sentenceList.indexOf(s);
@@ -181,7 +172,11 @@ public class MainViewModel {
                 });
     }
 
-    // Getters & Property Accessors
+    // Getter cho App dùng để đóng DB
+    public IStorageService getStorageService() {
+        return storageService;
+    }
+
     public ObservableList<Paragraph> getParagraphList() { return paragraphList.get(); }
     public ListProperty<Paragraph> paragraphListProperty() { return paragraphList; }
     public ObservableList<Image> getPdfPages() { return pdfPages.get(); }

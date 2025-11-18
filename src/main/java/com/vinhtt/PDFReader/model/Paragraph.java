@@ -12,12 +12,20 @@ public class Paragraph {
         this.yPosition = yPosition;
     }
 
-    // Getters and Setters
+    // --- Getters and Setters ---
+
+    // Phương thức thiếu gây lỗi
+    public int getId() { return id; }
+    public void setId(int id) { this.id = id; }
+
     public String getOriginalText() { return originalText; }
     public void setOriginalText(String originalText) { this.originalText = originalText; }
 
     public String getTranslatedText() { return translatedText; }
     public void setTranslatedText(String translatedText) { this.translatedText = translatedText; }
+
+    public float getYPosition() { return yPosition; }
+    public void setYPosition(float yPosition) { this.yPosition = yPosition; }
 
     @Override
     public String toString() {

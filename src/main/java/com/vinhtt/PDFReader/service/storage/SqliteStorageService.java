@@ -7,29 +7,39 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class SqliteStorageService implements IStorageService {
-    private String connectionUrl;
+    private Connection connection;
+
+    private Connection getConnection() throws SQLException {
+        if (connection == null || connection.isClosed()) {
+            // Không làm gì, phải gọi initDatabase trước
+            throw new SQLException("Database not initialized");
+        }
+        return connection;
+    }
 
     @Override
     public void initDatabase(String dbPath) {
-        connectionUrl = "jdbc:sqlite:" + dbPath;
-        try (Connection conn = DriverManager.getConnection(connectionUrl);
-             Statement stmt = conn.createStatement()) {
+        try {
+            if (connection != null && !connection.isClosed()) {
+                connection.close();
+            }
+            String url = "jdbc:sqlite:" + dbPath;
+            connection = DriverManager.getConnection(url);
 
-            // Bảng Paragraphs
-            stmt.execute("CREATE TABLE IF NOT EXISTS paragraphs (" +
-                    "id INTEGER PRIMARY KEY," +
-                    "original_text TEXT," +
-                    "translated_text TEXT," +
-                    "y_position REAL)");
+            try (Statement stmt = connection.createStatement()) {
+                stmt.execute("CREATE TABLE IF NOT EXISTS paragraphs (" +
+                        "id INTEGER PRIMARY KEY," +
+                        "original_text TEXT," +
+                        "translated_text TEXT," +
+                        "y_position REAL)");
 
-            // Bảng Sentences (Lưu kết quả Analysis)
-            stmt.execute("CREATE TABLE IF NOT EXISTS sentences (" +
-                    "id INTEGER PRIMARY KEY AUTOINCREMENT," +
-                    "paragraph_id INTEGER," +
-                    "original_text TEXT," +
-                    "analysis_json TEXT," +
-                    "FOREIGN KEY(paragraph_id) REFERENCES paragraphs(id))");
-
+                stmt.execute("CREATE TABLE IF NOT EXISTS sentences (" +
+                        "id INTEGER PRIMARY KEY AUTOINCREMENT," +
+                        "paragraph_id INTEGER," +
+                        "original_text TEXT," +
+                        "analysis_json TEXT," +
+                        "FOREIGN KEY(paragraph_id) REFERENCES paragraphs(id))");
+            }
         } catch (SQLException e) {
             e.printStackTrace();
         }
@@ -38,8 +48,7 @@ public class SqliteStorageService implements IStorageService {
     @Override
     public boolean hasData() {
         String sql = "SELECT count(*) FROM paragraphs";
-        try (Connection conn = DriverManager.getConnection(connectionUrl);
-             Statement stmt = conn.createStatement();
+        try (Statement stmt = getConnection().createStatement();
              ResultSet rs = stmt.executeQuery(sql)) {
             if (rs.next()) {
                 return rs.getInt(1) > 0;
@@ -53,17 +62,20 @@ public class SqliteStorageService implements IStorageService {
     @Override
     public void saveParagraphs(List<Paragraph> paragraphs) {
         String sql = "INSERT INTO paragraphs(id, original_text, y_position) VALUES(?,?,?)";
-        try (Connection conn = DriverManager.getConnection(connectionUrl)) {
+        try {
+            Connection conn = getConnection();
             conn.setAutoCommit(false);
             try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
                 for (Paragraph p : paragraphs) {
-                    pstmt.setInt(1, p.hashCode()); // ID dựa trên hashcode để đơn giản
+                    // FIX QUAN TRỌNG: Dùng p.getId() thay vì hashCode
+                    pstmt.setInt(1, p.getId());
                     pstmt.setString(2, p.getOriginalText());
                     pstmt.setFloat(3, 0);
                     pstmt.addBatch();
                 }
                 pstmt.executeBatch();
                 conn.commit();
+                conn.setAutoCommit(true);
             }
         } catch (SQLException e) {
             e.printStackTrace();
@@ -73,8 +85,7 @@ public class SqliteStorageService implements IStorageService {
     @Override
     public void updateParagraphTranslation(int id, String translatedText) {
         String sql = "UPDATE paragraphs SET translated_text = ? WHERE id = ?";
-        try (Connection conn = DriverManager.getConnection(connectionUrl);
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+        try (PreparedStatement pstmt = getConnection().prepareStatement(sql)) {
             pstmt.setString(1, translatedText);
             pstmt.setInt(2, id);
             pstmt.executeUpdate();
@@ -86,9 +97,8 @@ public class SqliteStorageService implements IStorageService {
     @Override
     public List<Paragraph> getAllParagraphs() {
         List<Paragraph> list = new ArrayList<>();
-        String sql = "SELECT * FROM paragraphs ORDER BY id ASC"; // Hoặc order theo Y nếu có
-        try (Connection conn = DriverManager.getConnection(connectionUrl);
-             Statement stmt = conn.createStatement();
+        String sql = "SELECT * FROM paragraphs ORDER BY id ASC";
+        try (Statement stmt = getConnection().createStatement();
              ResultSet rs = stmt.executeQuery(sql)) {
 
             while (rs.next()) {
@@ -110,8 +120,7 @@ public class SqliteStorageService implements IStorageService {
     public List<Sentence> getSentencesByParagraphId(int paragraphId) {
         List<Sentence> list = new ArrayList<>();
         String sql = "SELECT * FROM sentences WHERE paragraph_id = ?";
-        try (Connection conn = DriverManager.getConnection(connectionUrl);
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+        try (PreparedStatement pstmt = getConnection().prepareStatement(sql)) {
             pstmt.setInt(1, paragraphId);
             ResultSet rs = pstmt.executeQuery();
             while (rs.next()) {
@@ -131,7 +140,8 @@ public class SqliteStorageService implements IStorageService {
     @Override
     public void saveSentences(List<Sentence> sentences) {
         String sql = "INSERT INTO sentences(paragraph_id, original_text, analysis_json) VALUES(?,?,?)";
-        try (Connection conn = DriverManager.getConnection(connectionUrl)) {
+        try {
+            Connection conn = getConnection();
             conn.setAutoCommit(false);
             try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
                 for (Sentence s : sentences) {
@@ -142,6 +152,7 @@ public class SqliteStorageService implements IStorageService {
                 }
                 pstmt.executeBatch();
                 conn.commit();
+                conn.setAutoCommit(true);
             }
         } catch (SQLException e) {
             e.printStackTrace();
@@ -151,11 +162,22 @@ public class SqliteStorageService implements IStorageService {
     @Override
     public void updateSentenceAnalysis(int id, String analysisJson) {
         String sql = "UPDATE sentences SET analysis_json = ? WHERE id = ?";
-        try (Connection conn = DriverManager.getConnection(connectionUrl);
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+        try (PreparedStatement pstmt = getConnection().prepareStatement(sql)) {
             pstmt.setString(1, analysisJson);
             pstmt.setInt(2, id);
             pstmt.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    // Phương thức mới để đóng kết nối sạch sẽ
+    public void close() {
+        try {
+            if (connection != null && !connection.isClosed()) {
+                connection.close();
+                System.out.println("Database closed successfully.");
+            }
         } catch (SQLException e) {
             e.printStackTrace();
         }
