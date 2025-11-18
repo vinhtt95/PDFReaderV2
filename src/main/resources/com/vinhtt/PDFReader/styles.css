@@ -67,13 +67,15 @@
 .text-english {
     -fx-fill: -color-text-primary;
     -fx-font-size: 1em;
-    -fx-line-spacing: 0.2em;
+    -fx-line-spacing: 0.5em;
+    -fx-text-alignment: justify;
 }
 
 .text-vietnamese {
     -fx-fill: -color-text-secondary;
     -fx-font-size: 0.95em;
-    -fx-font-style: italic;
+    -fx-line-spacing: 0.5em;
+    -fx-text-alignment: justify;
 }
 
 .text-label-header {
