@@ -29,28 +29,24 @@ public class MainController {
 
     @FXML
     public void initialize() {
-        // 1. Bind Status & Font Size
         statusLabel.textProperty().bind(viewModel.statusMessageProperty());
 
-        // Lắng nghe thay đổi Font Size và cập nhật style cho root
         viewModel.appFontSizeProperty().addListener((obs, oldVal, newVal) -> {
             updateAppFontSize(newVal.intValue());
         });
-        // Apply font ban đầu (cần đợi scene load xong, nhưng setStyle trên node gốc thường ok)
+
         pdfContainer.sceneProperty().addListener((obs, oldScene, newScene) -> {
             if (newScene != null) {
                 updateAppFontSize(viewModel.appFontSizeProperty().get());
             }
         });
 
-        // 2. Setup Lists
         paragraphListView.setCellFactory(param -> new ParagraphTile(viewModel::translateParagraph));
         paragraphListView.itemsProperty().bind(viewModel.paragraphListProperty());
 
         sentenceListView.setCellFactory(param -> new SentenceTile(viewModel::analyzeSentence));
         sentenceListView.itemsProperty().bind(viewModel.sentenceListProperty());
 
-        // 3. Events
         paragraphListView.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
             viewModel.selectedParagraphProperty().set(newVal);
             if (newVal != null) viewModel.loadSentencesFor(newVal);
@@ -69,7 +65,6 @@ public class MainController {
 
     private void updateAppFontSize(int size) {
         if (pdfContainer.getScene() != null) {
-            // Set font size cho toàn bộ root
             pdfContainer.getScene().getRoot().setStyle("-fx-font-size: " + size + "px;");
         }
     }
@@ -103,7 +98,10 @@ public class MainController {
         promptArea.setPromptText("Custom Prompt...");
         promptArea.setPrefRowCount(3);
 
-        // Font Size Spinner
+        TextArea analysisPromptArea = new TextArea(ConfigLoader.getAnalysisPrompt());
+        analysisPromptArea.setPromptText("Analysis Prompt...");
+        analysisPromptArea.setPrefRowCount(3);
+
         Spinner<Integer> fontSizeSpinner = new Spinner<>(10, 30, ConfigLoader.getFontSize());
         fontSizeSpinner.setEditable(true);
 
@@ -111,18 +109,26 @@ public class MainController {
         grid.add(apiKeyField, 1, 0);
         grid.add(new Label("Model:"), 0, 1);
         grid.add(modelField, 1, 1);
-        grid.add(new Label("Prompt:"), 0, 2);
+        grid.add(new Label("Trans Prompt:"), 0, 2);
         grid.add(promptArea, 1, 2);
-        grid.add(new Label("Font Size:"), 0, 3);
-        grid.add(fontSizeSpinner, 1, 3);
+        grid.add(new Label("Analysis Prompt:"), 0, 3);
+        grid.add(analysisPromptArea, 1, 3);
+        grid.add(new Label("Font Size:"), 0, 4);
+        grid.add(fontSizeSpinner, 1, 4);
 
         dialog.getDialogPane().setContent(grid);
 
         dialog.setResultConverter(dialogButton -> {
             if (dialogButton == saveButtonType) {
                 int newSize = fontSizeSpinner.getValue();
-                ConfigLoader.saveSettings(apiKeyField.getText(), modelField.getText(), promptArea.getText(), newSize);
-                viewModel.setAppFontSize(newSize); // Update ViewModel để trigger UI change ngay
+                ConfigLoader.saveSettings(
+                        apiKeyField.getText(),
+                        modelField.getText(),
+                        promptArea.getText(),
+                        analysisPromptArea.getText(),
+                        newSize
+                );
+                viewModel.setAppFontSize(newSize);
                 return saveButtonType;
             }
             return null;

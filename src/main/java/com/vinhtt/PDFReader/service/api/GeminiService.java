@@ -11,7 +11,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
 public class GeminiService implements ITranslationService {
-    // Base URL không chứa tên model cứng
     private static final String BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models/";
     private final OkHttpClient client;
 
@@ -24,13 +23,12 @@ public class GeminiService implements ITranslationService {
 
     private CompletableFuture<String> callGemini(String prompt) {
         String apiKey = ConfigLoader.getApiKey();
-        String model = ConfigLoader.getGeminiModel(); // Lấy model từ setting
+        String model = ConfigLoader.getGeminiModel();
 
         if (apiKey.isEmpty()) {
             return CompletableFuture.failedFuture(new RuntimeException("API Key not found. Check Settings."));
         }
 
-        // Construct URL: .../models/{model}:generateContent
         String fullUrl = BASE_URL + model + ":generateContent?key=" + apiKey;
 
         JsonObject jsonBody = new JsonObject();
@@ -71,7 +69,6 @@ public class GeminiService implements ITranslationService {
                     String respStr = responseBody.string();
                     try {
                         JsonObject jsonResp = JsonParser.parseString(respStr).getAsJsonObject();
-                        // Handle case where response might be blocked or empty
                         if (jsonResp.has("candidates") && jsonResp.getAsJsonArray("candidates").size() > 0) {
                             String resultText = jsonResp.getAsJsonArray("candidates")
                                     .get(0).getAsJsonObject()
@@ -95,13 +92,13 @@ public class GeminiService implements ITranslationService {
 
     @Override
     public CompletableFuture<String> translate(String text) {
-        // Lấy prompt từ setting
         String customPrompt = ConfigLoader.getTranslationPrompt();
         return callGemini(customPrompt + "\n\n" + text);
     }
 
     @Override
     public CompletableFuture<String> analyze(String text) {
-        return callGemini("Analyze grammar (S-V-O, Tense) for: \n\n" + text);
+        String customPrompt = ConfigLoader.getAnalysisPrompt();
+        return callGemini(customPrompt + text);
     }
 }

@@ -1,21 +1,25 @@
 module com.vinhtt.PDFReader {
     requires javafx.controls;
     requires javafx.fxml;
-    requires javafx.swing; // Cần thiết cho SwingFXUtils (Render PDF)
+    requires javafx.swing;
+    requires javafx.web;
 
-    // Thư viện giao diện
     requires atlantafx.base;
     requires org.kordamp.ikonli.javafx;
     requires org.kordamp.ikonli.fontawesome5;
 
-    // Thư viện xử lý
     requires org.apache.pdfbox;
     requires java.sql;
     requires okhttp3;
     requires com.google.gson;
     requires org.slf4j;
     requires java.prefs;
-    requires java.desktop; // Cần thiết cho BufferedImage
+    requires java.desktop;
+
+    requires flexmark;
+    requires flexmark.util.ast;
+    requires flexmark.util.data;
+    requires flexmark.html2md.converter;
 
     opens com.vinhtt.PDFReader.view to javafx.fxml;
     opens com.vinhtt.PDFReader.app to javafx.fxml;

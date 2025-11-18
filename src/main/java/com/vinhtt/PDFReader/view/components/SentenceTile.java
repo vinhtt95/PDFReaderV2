@@ -8,7 +8,11 @@ import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Region;
+import javafx.scene.layout.StackPane; // Import mới
 import javafx.scene.layout.VBox;
+import javafx.scene.web.WebView;
+import com.vladsch.flexmark.html.HtmlRenderer;
+import com.vladsch.flexmark.parser.Parser;
 
 import java.util.function.Consumer;
 
@@ -25,7 +29,6 @@ public class SentenceTile extends ListCell<Sentence> {
         root.setPadding(new Insets(10));
         root.getStyleClass().add("card-view");
 
-        // Buttons Styling
         analyzeBtn.getStyleClass().add("button-action");
         vocabBtn.getStyleClass().add("button-action");
 
@@ -41,6 +44,23 @@ public class SentenceTile extends ListCell<Sentence> {
         footer.setPadding(new Insets(5, 0, 0, 0));
     }
 
+    private String renderMarkdownToHtml(String markdown) {
+        Parser parser = Parser.builder().build();
+        HtmlRenderer renderer = HtmlRenderer.builder().build();
+        String htmlContent = renderer.render(parser.parse(markdown));
+
+        // Inject CSS để match với Dark Theme
+        return "<html><head><style>" +
+                "body { background-color: #161b22; color: #c9d1d9; font-family: 'Segoe UI', sans-serif; font-size: 14px; margin: 0; padding: 0; }" +
+                "strong { color: #58a6ff; }" +
+                "code { background-color: #30363d; padding: 2px 4px; border-radius: 4px; font-family: monospace; }" +
+                "ul { padding-left: 20px; }" +
+                "p { margin-top: 5px; margin-bottom: 5px; }" +
+                "</style></head><body>" +
+                htmlContent +
+                "</body></html>";
+    }
+
     @Override
     protected void updateItem(Sentence item, boolean empty) {
         super.updateItem(item, empty);
@@ -49,7 +69,6 @@ public class SentenceTile extends ListCell<Sentence> {
             setGraphic(null);
             root.prefWidthProperty().unbind();
         } else {
-            // Binding width fix
             if (getListView() != null) {
                 root.prefWidthProperty().bind(getListView().widthProperty().subtract(45));
                 root.setMaxWidth(Region.USE_PREF_SIZE);
@@ -58,11 +77,11 @@ public class SentenceTile extends ListCell<Sentence> {
             root.getChildren().clear();
 
             // 1. Sentence
-            root.getChildren().add(createCollapsibleSection("Sentence", item.getOriginal(), "text-english", true));
+            root.getChildren().add(createCollapsibleSection("Sentence", item.getOriginal(), false, true));
 
             // 2. Analysis
             if (item.getAnalysis() != null && !item.getAnalysis().isEmpty()) {
-                root.getChildren().add(createCollapsibleSection("Grammar Analysis", item.getAnalysis(), "text-vietnamese", true));
+                root.getChildren().add(createCollapsibleSection("Grammar Analysis", item.getAnalysis(), true, true));
             } else {
                 // Toolbar
                 footer.getChildren().clear();
@@ -76,19 +95,34 @@ public class SentenceTile extends ListCell<Sentence> {
         }
     }
 
-    private VBox createCollapsibleSection(String title, String text, String cssClass, boolean isExpanded) {
+    private VBox createCollapsibleSection(String title, String text, boolean isMarkdown, boolean isExpanded) {
         VBox section = new VBox(2);
         Label header = new Label((isExpanded ? "▼ " : "▶ ") + title);
         header.getStyleClass().add("section-header");
         header.setMaxWidth(Double.MAX_VALUE);
 
-        Label content = new Label(text);
-        content.getStyleClass().add(cssClass);
-        content.setWrapText(true);
+        Region content;
 
+        if (isMarkdown) {
+            WebView webView = new WebView();
+            webView.getEngine().loadContent(renderMarkdownToHtml(text));
+            webView.setPageFill(javafx.scene.paint.Color.TRANSPARENT);
+            webView.setContextMenuEnabled(false);
+            webView.setPrefHeight(300);
+
+            // FIX: Bọc WebView trong StackPane (StackPane là một Region)
+            StackPane wrapper = new StackPane(webView);
+            content = wrapper;
+        } else {
+            Label label = new Label(text);
+            label.getStyleClass().add("text-english");
+            label.setWrapText(true);
+            content = label;
+        }
+
+        // Binding chung cho Region (Giờ StackPane sẽ nhận binding này)
         content.prefWidthProperty().bind(root.widthProperty());
         content.setMaxWidth(Region.USE_PREF_SIZE);
-        content.setMinHeight(Region.USE_PREF_SIZE);
 
         content.setManaged(isExpanded);
         content.setVisible(isExpanded);

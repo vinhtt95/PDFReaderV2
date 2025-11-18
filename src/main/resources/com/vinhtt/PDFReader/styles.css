@@ -74,6 +74,7 @@
 .text-vietnamese {
     -fx-fill: -color-text-secondary;
     -fx-font-size: 0.95em;
+    -fx-font-style: italic;
     -fx-line-spacing: 0.5em;
     -fx-text-alignment: justify;
 }

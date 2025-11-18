@@ -16,7 +16,7 @@ public class App extends Application {
 
         // 2. Load Main View
         FXMLLoader fxmlLoader = new FXMLLoader(App.class.getResource("/com/vinhtt/PDFReader/view/MainView.fxml"));
-        Scene scene = new Scene(fxmlLoader.load(), 1280, 720);
+        Scene scene = new Scene(fxmlLoader.load(), 1440, 1000);
 
         // 3. Customize Stage
         stage.setTitle("Smart English PDF Reader");
