@@ -25,19 +25,20 @@ import java.util.List;
 import java.util.Locale;
 import java.util.stream.Collectors;
 
+/**
+ * ViewModel chính quản lý trạng thái và logic nghiệp vụ của màn hình đọc PDF.
+ */
 public class MainViewModel {
-    // Dữ liệu gốc (Toàn bộ)
+
     private final List<Paragraph> allParagraphs = new ArrayList<>();
     private final List<Image> allPdfImages = new ArrayList<>();
 
-    // Dữ liệu hiển thị (Theo trang)
     private final ListProperty<Paragraph> visibleParagraphList = new SimpleListProperty<>(FXCollections.observableArrayList());
     private final ObjectProperty<Image> currentPdfPageImage = new SimpleObjectProperty<>();
 
     private final ListProperty<Sentence> sentenceList = new SimpleListProperty<>(FXCollections.observableArrayList());
     private final ObjectProperty<Paragraph> selectedParagraph = new SimpleObjectProperty<>();
 
-    // Trạng thái trang
     private final IntegerProperty currentPage = new SimpleIntegerProperty(0);
     private final IntegerProperty totalPages = new SimpleIntegerProperty(0);
     private final StringProperty statusMessage = new SimpleStringProperty("Ready");
@@ -47,52 +48,67 @@ public class MainViewModel {
     private final ITranslationService translationService;
     private final IStorageService storageService;
 
+    /**
+     * Khởi tạo ViewModel và các service đi kèm.
+     */
     public MainViewModel() {
         this.pdfService = new PdfBoxService();
         this.translationService = new GeminiService();
         this.storageService = new SqliteStorageService();
 
-        // Khi đổi trang -> Update dữ liệu hiển thị
         currentPage.addListener((obs, oldVal, newVal) -> updateCurrentPageView());
     }
 
+    /**
+     * Cập nhật dữ liệu hiển thị khi người dùng chuyển trang.
+     */
     private void updateCurrentPageView() {
         int page = currentPage.get();
         if (page >= 0 && page < allPdfImages.size()) {
-            // 1. Update Image
             currentPdfPageImage.set(allPdfImages.get(page));
 
-            // 2. Filter Paragraphs
             List<Paragraph> pageParagraphs = allParagraphs.stream()
                     .filter(p -> p.getPageIndex() == page)
                     .collect(Collectors.toList());
             visibleParagraphList.setAll(pageParagraphs);
 
-            // 3. Clear selection
             selectedParagraph.set(null);
             sentenceList.clear();
         }
     }
 
-    // Navigation Methods
+    /**
+     * Chuyển sang trang kế tiếp.
+     */
     public void nextPage() {
         if (currentPage.get() < totalPages.get() - 1) {
             currentPage.set(currentPage.get() + 1);
         }
     }
 
+    /**
+     * Quay lại trang trước đó.
+     */
     public void prevPage() {
         if (currentPage.get() > 0) {
             currentPage.set(currentPage.get() - 1);
         }
     }
 
+    /**
+     * Nhảy tới một trang cụ thể.
+     * @param pageIndex chỉ số trang (bắt đầu từ 0)
+     */
     public void goToPage(int pageIndex) {
         if (pageIndex >= 0 && pageIndex < totalPages.get()) {
             currentPage.set(pageIndex);
         }
     }
 
+    /**
+     * Tải file PDF, render hình ảnh và parse text.
+     * @param file file PDF đầu vào
+     */
     public void loadPdf(File file) {
         statusMessage.set("Initializing...");
         Task<Void> task = new Task<>() {
@@ -101,7 +117,6 @@ public class MainViewModel {
                 String dbPath = file.getParent() + File.separator + file.getName() + ".meta.db";
                 storageService.initDatabase(dbPath);
 
-                // 1. Render Images (Heavy task)
                 updateMessage("Rendering PDF Pages...");
                 List<BufferedImage> bufferedImages = pdfService.renderPdfPages(file);
                 allPdfImages.clear();
@@ -109,7 +124,6 @@ public class MainViewModel {
                     allPdfImages.add(SwingFXUtils.toFXImage(bi, null));
                 }
 
-                // 2. Load Paragraphs
                 if (storageService.hasData()) {
                     updateMessage("Loading Data...");
                     allParagraphs.clear();
@@ -124,8 +138,8 @@ public class MainViewModel {
 
                 Platform.runLater(() -> {
                     totalPages.set(allPdfImages.size());
-                    currentPage.set(0); // Reset về trang đầu
-                    updateCurrentPageView(); // Force update lần đầu
+                    currentPage.set(0);
+                    updateCurrentPageView();
                     statusMessage.set("Loaded: " + file.getName());
                 });
                 return null;
@@ -143,17 +157,18 @@ public class MainViewModel {
         t.start();
     }
 
-    // ... (Các hàm translate, analyze giữ nguyên logic, chỉ đổi paragraphList thành visibleParagraphList nếu cần update UI)
-
+    /**
+     * Dịch đoạn văn bản được chọn.
+     * Hàm này cho phép gọi lại để dịch lại (Re-translate) đè lên nội dung cũ.
+     * @param p Đoạn văn cần dịch
+     */
     public void translateParagraph(Paragraph p) {
-        if (p.getTranslatedText() != null && !p.getTranslatedText().isEmpty()) return;
         statusMessage.set("Translating...");
         translationService.translate(p.getOriginalText())
                 .thenAccept(translated -> {
                     storageService.updateParagraphTranslation(p.getId(), translated);
                     Platform.runLater(() -> {
                         p.setTranslatedText(translated);
-                        // Refresh list item
                         int index = visibleParagraphList.indexOf(p);
                         if (index >= 0) visibleParagraphList.set(index, p);
                         statusMessage.set("Done.");
@@ -161,12 +176,16 @@ public class MainViewModel {
                 });
     }
 
+    /**
+     * Tách câu cho đoạn văn được chọn và load dữ liệu từ DB nếu có.
+     * @param p Đoạn văn được chọn
+     */
     public void loadSentencesFor(Paragraph p) {
         if (p == null) {
             sentenceList.clear();
             return;
         }
-        // Logic tách câu giữ nguyên
+
         Task<List<Sentence>> task = new Task<>() {
             @Override
             protected List<Sentence> call() throws Exception {
@@ -192,8 +211,12 @@ public class MainViewModel {
         t.start();
     }
 
+    /**
+     * Phân tích ngữ pháp cho câu được chọn.
+     * Hàm này cho phép gọi lại để phân tích lại (Re-analyze) đè lên nội dung cũ.
+     * @param s Câu cần phân tích
+     */
     public void analyzeSentence(Sentence s) {
-        if (s.getAnalysis() != null && !s.getAnalysis().isEmpty()) return;
         statusMessage.set("Analyzing...");
         translationService.analyze(s.getOriginal())
                 .thenAccept(result -> {
@@ -209,7 +232,6 @@ public class MainViewModel {
 
     public IStorageService getStorageService() { return storageService; }
 
-    // Expose Properties
     public ObservableList<Paragraph> getVisibleParagraphList() { return visibleParagraphList.get(); }
     public ListProperty<Paragraph> visibleParagraphListProperty() { return visibleParagraphList; }
 

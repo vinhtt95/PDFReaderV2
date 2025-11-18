@@ -7,7 +7,9 @@ import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
+import javafx.scene.control.Tooltip;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
@@ -17,6 +19,10 @@ import com.vladsch.flexmark.parser.Parser;
 
 import java.util.function.Consumer;
 
+/**
+ * ListCell tùy chỉnh để hiển thị chi tiết câu (Sentence).
+ * Hỗ trợ hiển thị phân tích ngữ pháp dạng Markdown/HTML.
+ */
 public class SentenceTile extends ListCell<Sentence> {
     private final VBox root = new VBox(8);
     private final Button analyzeBtn = new Button("Analyze Grammar");
@@ -26,6 +32,10 @@ public class SentenceTile extends ListCell<Sentence> {
 
     private static final double ANALYSIS_HEIGHT = 300.0;
 
+    /**
+     * Khởi tạo SentenceTile.
+     * @param onAnalyzeAction Callback xử lý khi nhấn nút phân tích
+     */
     public SentenceTile(Consumer<Sentence> onAnalyzeAction) {
         this.onAnalyzeAction = onAnalyzeAction;
 
@@ -47,6 +57,11 @@ public class SentenceTile extends ListCell<Sentence> {
         footer.setPadding(new Insets(5, 0, 0, 0));
     }
 
+    /**
+     * Chuyển đổi nội dung Markdown sang HTML có style.
+     * @param markdown Chuỗi markdown đầu vào
+     * @return Chuỗi HTML đầy đủ
+     */
     private String renderMarkdownToHtml(String markdown) {
         if (markdown == null) return "";
 
@@ -99,10 +114,11 @@ public class SentenceTile extends ListCell<Sentence> {
 
             root.getChildren().clear();
 
-            root.getChildren().add(createCollapsibleSection("Sentence", item.getOriginal(), false, true));
+            root.getChildren().add(createCollapsibleSection("Sentence", item.getOriginal(), false, true, null));
 
             if (item.getAnalysis() != null && !item.getAnalysis().isEmpty()) {
-                root.getChildren().add(createCollapsibleSection("Grammar Analysis", item.getAnalysis(), true, true));
+                Runnable onReAnalyze = () -> onAnalyzeAction.accept(item);
+                root.getChildren().add(createCollapsibleSection("Grammar Analysis", item.getAnalysis(), true, true, onReAnalyze));
             } else {
                 footer.getChildren().clear();
                 analyzeBtn.setText("Analyze Grammar");
@@ -115,11 +131,37 @@ public class SentenceTile extends ListCell<Sentence> {
         }
     }
 
-    private VBox createCollapsibleSection(String title, String text, boolean isMarkdown, boolean isExpanded) {
+    /**
+     * Tạo section hiển thị nội dung, hỗ trợ Markdown WebView hoặc Label thường.
+     * @param title Tiêu đề section
+     * @param text Nội dung văn bản
+     * @param isMarkdown true nếu nội dung là Markdown cần render HTML
+     * @param isExpanded Trạng thái mở rộng mặc định
+     * @param onRefresh Callback khi nhấn nút refresh (có thể null)
+     * @return VBox chứa section
+     */
+    private VBox createCollapsibleSection(String title, String text, boolean isMarkdown, boolean isExpanded, Runnable onRefresh) {
         VBox section = new VBox(5);
-        Label header = new Label((isExpanded ? "▼ " : "▶ ") + title);
-        header.getStyleClass().add("section-header");
-        header.setMaxWidth(Double.MAX_VALUE);
+
+        HBox headerBox = new HBox(10);
+        headerBox.setAlignment(Pos.CENTER_LEFT);
+        headerBox.getStyleClass().add("section-header");
+
+        Label headerLabel = new Label((isExpanded ? "▼ " : "▶ ") + title);
+        headerLabel.setMaxWidth(Double.MAX_VALUE);
+        HBox.setHgrow(headerLabel, Priority.ALWAYS);
+        headerBox.getChildren().add(headerLabel);
+
+        if (onRefresh != null) {
+            Button refreshBtn = new Button("↻");
+            refreshBtn.setStyle("-fx-background-color: transparent; -fx-text-fill: #58a6ff; -fx-font-size: 12px; -fx-padding: 0 5px; -fx-cursor: hand;");
+            refreshBtn.setTooltip(new Tooltip("Re-analyze"));
+            refreshBtn.setOnAction(e -> {
+                e.consume();
+                onRefresh.run();
+            });
+            headerBox.getChildren().add(refreshBtn);
+        }
 
         Region content;
 
@@ -157,14 +199,14 @@ public class SentenceTile extends ListCell<Sentence> {
         content.setManaged(isExpanded);
         content.setVisible(isExpanded);
 
-        header.setOnMouseClicked(e -> {
+        headerLabel.setOnMouseClicked(e -> {
             boolean newState = !content.isVisible();
             content.setVisible(newState);
             content.setManaged(newState);
-            header.setText((newState ? "▼ " : "▶ ") + title);
+            headerLabel.setText((newState ? "▼ " : "▶ ") + title);
         });
 
-        section.getChildren().addAll(header, content);
+        section.getChildren().addAll(headerBox, content);
         return section;
     }
 }
