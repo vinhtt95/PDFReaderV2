@@ -35,7 +35,7 @@
     </top>
 
     <center>
-        <SplitPane dividerPositions="0.4, 0.7">
+        <SplitPane fx:id="mainSplitPane" dividerPositions="0.4, 0.7">
 
             <VBox styleClass="vbox-container" spacing="5">
                 <HBox alignment="CENTER_LEFT" spacing="10" style="-fx-padding: 5; -fx-background-color: #161b22; -fx-border-color: #30363d; -fx-border-width: 0 0 1 0;">

@@ -6,6 +6,7 @@ import com.vinhtt.PDFReader.view.components.ParagraphTile;
 import com.vinhtt.PDFReader.view.components.SentenceTile;
 import com.vinhtt.PDFReader.viewmodel.MainViewModel;
 import com.vinhtt.PDFReader.util.ConfigLoader;
+import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
 import javafx.scene.image.ImageView;
@@ -15,11 +16,16 @@ import javafx.stage.FileChooser;
 
 import java.io.File;
 
+/**
+ * Controller for the Main View.
+ * Handles UI events and binds data to the ViewModel.
+ */
 public class MainController {
 
     @FXML private ScrollPane pdfContainer;
     @FXML private VBox pdfPageContainer;
-    @FXML private ImageView pdfImageView; // New Injection
+    @FXML private ImageView pdfImageView;
+    @FXML private SplitPane mainSplitPane;
 
     @FXML private TextField pageInputField;
     @FXML private Label totalPagesLabel;
@@ -43,7 +49,6 @@ public class MainController {
 
         // --- List View Setup ---
         paragraphListView.setCellFactory(param -> new ParagraphTile(viewModel::translateParagraph));
-        // FIX: Bind vào visibleParagraphList thay vì paragraphList
         paragraphListView.itemsProperty().bind(viewModel.visibleParagraphListProperty());
 
         sentenceListView.setCellFactory(param -> new SentenceTile(viewModel::analyzeSentence));
@@ -56,9 +61,7 @@ public class MainController {
         });
 
         // --- PDF Image Binding ---
-        // Bind Image View với property currentPdfPageImage
         pdfImageView.imageProperty().bind(viewModel.currentPdfPageImageProperty());
-        // Bind chiều rộng ảnh để responsive
         pdfImageView.fitWidthProperty().bind(pdfContainer.widthProperty().subtract(20));
 
         // --- Pagination Binding ---
@@ -66,9 +69,9 @@ public class MainController {
                 totalPagesLabel.setText("/ " + newVal));
 
         viewModel.currentPageProperty().addListener((obs, oldVal, newVal) ->
-                pageInputField.setText(String.valueOf(newVal.intValue() + 1))); // Hiển thị 1-based
+                pageInputField.setText(String.valueOf(newVal.intValue() + 1)));
 
-        // Xử lý nhập số trang
+        // Page Navigation Input
         pageInputField.setOnAction(e -> {
             try {
                 int page = Integer.parseInt(pageInputField.getText()) - 1;
@@ -77,6 +80,24 @@ public class MainController {
                 pageInputField.setText(String.valueOf(viewModel.currentPageProperty().get() + 1));
             }
         });
+
+        // Restore Divider Positions
+        double[] savedDivs = ConfigLoader.getDividerPositions();
+        if (savedDivs != null) {
+            Platform.runLater(() -> mainSplitPane.setDividerPositions(savedDivs));
+        }
+    }
+
+    /**
+     * Saves the current UI state (divider positions) to configuration.
+     */
+    public void saveUiState() {
+        if (mainSplitPane != null) {
+            double[] divs = mainSplitPane.getDividerPositions();
+            if (divs != null && divs.length >= 2) {
+                ConfigLoader.saveDividerPositions(divs[0], divs[1]);
+            }
+        }
     }
 
     private void updateAppFontSize(int size) {

@@ -54,7 +54,7 @@ public class MainViewModel {
     private final IStorageService storageService;
 
     // Cấu hình Render chất lượng cao
-    private static final float HIGH_QUALITY_SCALE = 3.0f; // Tương đương ~216 DPI
+    private static final float HIGH_QUALITY_SCALE = 1.0f; // Tương đương ~216 DPI
 
     /**
      * Khởi tạo ViewModel và các service đi kèm.
