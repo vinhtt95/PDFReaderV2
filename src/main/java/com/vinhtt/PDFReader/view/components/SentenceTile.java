@@ -30,7 +30,7 @@ public class SentenceTile extends ListCell<Sentence> {
     private final HBox footer = new HBox(10);
     private final Consumer<Sentence> onAnalyzeAction;
 
-    private static final double ANALYSIS_HEIGHT = 600.0;
+    private static final double ANALYSIS_HEIGHT = 750.0;
 
     /**
      * Khởi tạo SentenceTile.
