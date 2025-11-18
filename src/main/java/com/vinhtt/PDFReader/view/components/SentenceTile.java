@@ -1,7 +1,7 @@
 package com.vinhtt.PDFReader.view.components;
 
 import com.vinhtt.PDFReader.model.Sentence;
-import com.vinhtt.PDFReader.util.ConfigLoader; // Import ConfigLoader
+import com.vinhtt.PDFReader.util.ConfigLoader;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
@@ -24,7 +24,6 @@ public class SentenceTile extends ListCell<Sentence> {
     private final HBox footer = new HBox(10);
     private final Consumer<Sentence> onAnalyzeAction;
 
-    // Chiều cao cố định cho khung Analysis
     private static final double ANALYSIS_HEIGHT = 300.0;
 
     public SentenceTile(Consumer<Sentence> onAnalyzeAction) {
@@ -51,20 +50,18 @@ public class SentenceTile extends ListCell<Sentence> {
     private String renderMarkdownToHtml(String markdown) {
         if (markdown == null) return "";
 
-        // Lấy font size từ Setting để đồng bộ với App
         int fontSize = ConfigLoader.getFontSize();
 
         Parser parser = Parser.builder().build();
         HtmlRenderer renderer = HtmlRenderer.builder().build();
         String htmlContent = renderer.render(parser.parse(markdown));
 
-        // Inject CSS với font-size động
         return "<html><head><style>" +
                 "body { " +
                 "   background-color: #161b22; " +
                 "   color: #c9d1d9; " +
                 "   font-family: 'Segoe UI', sans-serif; " +
-                "   font-size: " + fontSize + "px; " + // <--- SỬ DỤNG BIẾN FONT SIZE
+                "   font-size: " + fontSize + "px; " +
                 "   line-height: 1.6; " +
                 "   margin: 0; " +
                 "   padding: 10px; " +
@@ -77,7 +74,6 @@ public class SentenceTile extends ListCell<Sentence> {
                 "   border-radius: 4px; " +
                 "   font-family: 'Consolas', monospace; " +
                 "   color: #ff7b72; " +
-                // Tăng font size cho code block một chút cho dễ đọc nếu cần
                 "   font-size: " + (fontSize - 1) + "px; " +
                 "} " +
                 "ul, ol { padding-left: 20px; margin: 5px 0; } " +
@@ -103,10 +99,8 @@ public class SentenceTile extends ListCell<Sentence> {
 
             root.getChildren().clear();
 
-            // 1. Câu gốc
             root.getChildren().add(createCollapsibleSection("Sentence", item.getOriginal(), false, true));
 
-            // 2. Phân tích (Markdown / WebView)
             if (item.getAnalysis() != null && !item.getAnalysis().isEmpty()) {
                 root.getChildren().add(createCollapsibleSection("Grammar Analysis", item.getAnalysis(), true, true));
             } else {
@@ -135,7 +129,6 @@ public class SentenceTile extends ListCell<Sentence> {
             webView.setPageFill(javafx.scene.paint.Color.TRANSPARENT);
             webView.getEngine().loadContent(renderMarkdownToHtml(text));
 
-            // Fix layout size
             webView.setMinHeight(ANALYSIS_HEIGHT);
             webView.setPrefHeight(ANALYSIS_HEIGHT);
             webView.setMaxHeight(ANALYSIS_HEIGHT);
@@ -153,7 +146,10 @@ public class SentenceTile extends ListCell<Sentence> {
             Label label = new Label(text);
             label.getStyleClass().add("text-english");
             label.setWrapText(true);
+
             label.setMaxWidth(Region.USE_PREF_SIZE);
+            label.setMinHeight(Region.USE_PREF_SIZE);
+
             content = label;
         }
 
