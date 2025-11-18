@@ -1,35 +1,63 @@
 package com.vinhtt.PDFReader.view;
 
 import com.vinhtt.PDFReader.model.Paragraph;
+import com.vinhtt.PDFReader.view.components.ParagraphTile;
+import com.vinhtt.PDFReader.viewmodel.MainViewModel;
+import com.vinhtt.PDFReader.util.ConfigLoader;
 import javafx.fxml.FXML;
-import javafx.scene.control.ListView;
-import javafx.scene.control.ScrollPane;
-import javafx.scene.control.TextArea;
+import javafx.scene.control.*;
+import javafx.stage.FileChooser;
+
+import java.io.File;
+import java.util.Optional;
 
 public class MainController {
 
-    @FXML
-    private ScrollPane pdfContainer;
+    @FXML private ScrollPane pdfContainer;
+    @FXML private ListView<Paragraph> paragraphListView;
+    @FXML private TextArea analysisArea;
+    @FXML private Label statusLabel; // Bạn cần thêm Label này vào FXML nếu muốn hiển thị status
 
-    @FXML
-    private ListView<Paragraph> paragraphListView;
-
-    @FXML
-    private TextArea analysisArea;
+    private final MainViewModel viewModel = new MainViewModel();
 
     @FXML
     public void initialize() {
-        // Tạo dữ liệu giả để test giao diện
-        Paragraph p1 = new Paragraph(1, "The essential software requirement", 100.0f);
-        Paragraph p2 = new Paragraph(2, "Hello, Phil? This is Maria in Human Resources.", 150.0f);
+        // 1. Setup ListView with Custom Cell
+        paragraphListView.setCellFactory(param -> new ParagraphTile(viewModel::translateParagraph));
 
-        paragraphListView.getItems().addAll(p1, p2);
+        // 2. Bind Data
+        paragraphListView.itemsProperty().bind(viewModel.paragraphListProperty());
 
-        // Xử lý sự kiện khi click vào item
+        // 3. Listen to Selection
         paragraphListView.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
+            viewModel.selectedParagraphProperty().set(newVal);
             if (newVal != null) {
-                analysisArea.setText("Analysis for: " + newVal.getOriginalText() + "\n\n[Gemini Analysis Loading...]");
+                analysisArea.setText("Original: " + newVal.getOriginalText());
             }
         });
+
+        // 4. Setup Menu Actions (Quick implementation via lookup or binding)
+        // Note: In real app, define menuItem fx:id and set onAction here
+    }
+
+    // Method called from FXML Menu "Open PDF..."
+    public void onOpenPdf() {
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("PDF Files", "*.pdf"));
+        File file = fileChooser.showOpenDialog(pdfContainer.getScene().getWindow());
+        if (file != null) {
+            viewModel.loadPdf(file);
+        }
+    }
+
+    // Method called from FXML Menu "Settings"
+    public void onOpenSettings() {
+        TextInputDialog dialog = new TextInputDialog(ConfigLoader.getApiKey());
+        dialog.setTitle("Settings");
+        dialog.setHeaderText("Gemini API Configuration");
+        dialog.setContentText("Enter API Key:");
+
+        Optional<String> result = dialog.showAndWait();
+        result.ifPresent(ConfigLoader::saveApiKey);
     }
 }

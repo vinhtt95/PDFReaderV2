@@ -12,7 +12,8 @@ module com.vinhtt.PDFReader {
     requires java.sql;             // Cho SQLite
     requires okhttp3;              // Cho Gemini API
     requires com.google.gson;      // Cho JSON
-    requires org.slf4j;            // Cho Logging
+    requires org.slf4j;
+    requires java.prefs;            // Cho Logging
 
     // Mở gói view để JavaFX FXML loader có thể truy cập
     opens com.vinhtt.PDFReader.view to javafx.fxml;

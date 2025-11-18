@@ -19,8 +19,8 @@
             <menus>
                 <Menu text="File">
                     <items>
-                        <MenuItem text="Open PDF..." />
-                        <MenuItem text="Settings" />
+                        <MenuItem text="Open PDF..." onAction="#onOpenPdf" />
+                        <MenuItem text="Settings"  onAction="#onOpenSettings"/>
                         <MenuItem text="Exit" />
                     </items>
                 </Menu>
