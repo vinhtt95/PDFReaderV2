@@ -1,6 +1,7 @@
 package com.vinhtt.PDFReader.view.components;
 
 import com.vinhtt.PDFReader.model.Sentence;
+import com.vinhtt.PDFReader.util.ConfigLoader; // Import ConfigLoader
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
@@ -23,7 +24,7 @@ public class SentenceTile extends ListCell<Sentence> {
     private final HBox footer = new HBox(10);
     private final Consumer<Sentence> onAnalyzeAction;
 
-    // Định nghĩa chiều cao cố định cho khung Analysis để tránh lỗi layout 0px
+    // Chiều cao cố định cho khung Analysis
     private static final double ANALYSIS_HEIGHT = 300.0;
 
     public SentenceTile(Consumer<Sentence> onAnalyzeAction) {
@@ -50,20 +51,23 @@ public class SentenceTile extends ListCell<Sentence> {
     private String renderMarkdownToHtml(String markdown) {
         if (markdown == null) return "";
 
+        // Lấy font size từ Setting để đồng bộ với App
+        int fontSize = ConfigLoader.getFontSize();
+
         Parser parser = Parser.builder().build();
         HtmlRenderer renderer = HtmlRenderer.builder().build();
         String htmlContent = renderer.render(parser.parse(markdown));
 
-        // CSS: Đảm bảo background và màu chữ tương phản rõ rệt
+        // Inject CSS với font-size động
         return "<html><head><style>" +
                 "body { " +
                 "   background-color: #161b22; " +
                 "   color: #c9d1d9; " +
                 "   font-family: 'Segoe UI', sans-serif; " +
-                "   font-size: 14px; " +
+                "   font-size: " + fontSize + "px; " + // <--- SỬ DỤNG BIẾN FONT SIZE
                 "   line-height: 1.6; " +
                 "   margin: 0; " +
-                "   padding: 10px; " + // Thêm padding để chữ không sát lề
+                "   padding: 10px; " +
                 "   overflow-x: hidden; " +
                 "} " +
                 "strong { color: #58a6ff; font-weight: bold; } " +
@@ -73,6 +77,8 @@ public class SentenceTile extends ListCell<Sentence> {
                 "   border-radius: 4px; " +
                 "   font-family: 'Consolas', monospace; " +
                 "   color: #ff7b72; " +
+                // Tăng font size cho code block một chút cho dễ đọc nếu cần
+                "   font-size: " + (fontSize - 1) + "px; " +
                 "} " +
                 "ul, ol { padding-left: 20px; margin: 5px 0; } " +
                 "li { margin-bottom: 4px; } " +
@@ -90,7 +96,6 @@ public class SentenceTile extends ListCell<Sentence> {
             setGraphic(null);
             root.prefWidthProperty().unbind();
         } else {
-            // Binding chiều rộng của root theo ListView
             if (getListView() != null) {
                 root.prefWidthProperty().bind(getListView().widthProperty().subtract(45));
                 root.setMaxWidth(Region.USE_PREF_SIZE);
@@ -105,7 +110,6 @@ public class SentenceTile extends ListCell<Sentence> {
             if (item.getAnalysis() != null && !item.getAnalysis().isEmpty()) {
                 root.getChildren().add(createCollapsibleSection("Grammar Analysis", item.getAnalysis(), true, true));
             } else {
-                // Toolbar Buttons
                 footer.getChildren().clear();
                 analyzeBtn.setText("Analyze Grammar");
                 analyzeBtn.setDisable(false);
@@ -128,30 +132,22 @@ public class SentenceTile extends ListCell<Sentence> {
         if (isMarkdown) {
             WebView webView = new WebView();
             webView.setContextMenuEnabled(false);
-            webView.setPageFill(javafx.scene.paint.Color.TRANSPARENT); // Quan trọng: nền trong suốt để thấy màu background body HTML
+            webView.setPageFill(javafx.scene.paint.Color.TRANSPARENT);
             webView.getEngine().loadContent(renderMarkdownToHtml(text));
 
-            // --- FIX QUAN TRỌNG: ÉP KÍCH THƯỚC ---
-            // WebView trong ListCell cực kỳ dễ bị lỗi kích thước 0.
-            // Ta phải ép MinHeight và PrefHeight.
+            // Fix layout size
             webView.setMinHeight(ANALYSIS_HEIGHT);
             webView.setPrefHeight(ANALYSIS_HEIGHT);
             webView.setMaxHeight(ANALYSIS_HEIGHT);
-
-            // Ép MinWidth để tránh bị bóp nghẹt chiều ngang
             webView.setMinWidth(200);
 
             StackPane wrapper = new StackPane(webView);
-            // Wrapper cũng phải ép chiều cao theo WebView
             wrapper.setMinHeight(ANALYSIS_HEIGHT);
             wrapper.setPrefHeight(ANALYSIS_HEIGHT);
 
-            // Style border cho đẹp (tùy chọn)
             wrapper.setStyle("-fx-border-color: #30363d; -fx-border-width: 1px; -fx-border-radius: 4px;");
 
-            // Binding Width: WebView phải fill theo Wrapper
             webView.prefWidthProperty().bind(wrapper.widthProperty());
-
             content = wrapper;
         } else {
             Label label = new Label(text);
@@ -161,9 +157,7 @@ public class SentenceTile extends ListCell<Sentence> {
             content = label;
         }
 
-        // Binding Width chung cho Section Content
         content.prefWidthProperty().bind(root.widthProperty());
-
         content.setManaged(isExpanded);
         content.setVisible(isExpanded);
 
