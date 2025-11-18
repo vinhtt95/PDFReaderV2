@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.ListView?>
+<?import javafx.scene.control.Menu?>
+<?import javafx.scene.control.MenuBar?>
+<?import javafx.scene.control.MenuItem?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.SplitPane?>
+<?import javafx.scene.control.TextArea?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.VBox?>
+
+<BorderPane xmlns="http://javafx.com/javafx/21"
+            xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="com.vinhtt.PDFReader.view.MainController">
+
+    <top>
+        <MenuBar BorderPane.alignment="CENTER">
+            <menus>
+                <Menu text="File">
+                    <items>
+                        <MenuItem text="Open PDF..." />
+                        <MenuItem text="Settings" />
+                        <MenuItem text="Exit" />
+                    </items>
+                </Menu>
+                <Menu text="Help">
+                    <items>
+                        <MenuItem text="About" />
+                    </items>
+                </Menu>
+            </menus>
+        </MenuBar>
+    </top>
+
+    <center>
+        <SplitPane dividerPositions="0.4, 0.7">
+
+            <VBox>
+                <ScrollPane fx:id="pdfContainer" fitToWidth="true" VBox.vgrow="ALWAYS">
+                </ScrollPane>
+            </VBox>
+
+            <VBox>
+                <ListView fx:id="paragraphListView" VBox.vgrow="ALWAYS"/>
+            </VBox>
+
+            <VBox>
+                <TextArea fx:id="analysisArea" wrapText="true" VBox.vgrow="ALWAYS" editable="false"/>
+            </VBox>
+
+        </SplitPane>
+    </center>
+</BorderPane>
