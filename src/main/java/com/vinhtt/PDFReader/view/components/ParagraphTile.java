@@ -3,24 +3,22 @@ package com.vinhtt.PDFReader.view.components;
 import com.vinhtt.PDFReader.model.Paragraph;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
-import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.layout.HBox;
-import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
-import org.kordamp.ikonli.javafx.FontIcon; // Nếu bạn dùng icon, không thì dùng text
 
 import java.util.function.Consumer;
 
 public class ParagraphTile extends ListCell<Paragraph> {
-    private final VBox root = new VBox(5);
-    private final Button translateBtn = new Button("Translate");
+    private final VBox root = new VBox(8); // Tăng khoảng cách spacer một chút
+    private final Button translateBtn = new Button("Translate Paragraph");
+    private final HBox footer = new HBox(translateBtn); // Footer chứa nút
     private final Consumer<Paragraph> onTranslateAction;
 
-    // Containers cho các section để có thể update nội dung sau
+    // Containers cho các section
     private VBox originalSection;
     private VBox translatedSection;
 
@@ -28,24 +26,23 @@ public class ParagraphTile extends ListCell<Paragraph> {
         this.onTranslateAction = onTranslateAction;
 
         // 1. Main Layout
-        root.setPadding(new Insets(10));
+        root.setPadding(new Insets(15));
         root.getStyleClass().add("card-view");
 
-        // BINDING QUAN TRỌNG ĐỂ WRAP TEXT:
-        // Chiều rộng root = Chiều rộng Cell - Padding (30px)
-        root.prefWidthProperty().bind(this.widthProperty().subtract(30));
-        root.setMaxWidth(Region.USE_PREF_SIZE);
+        // Lưu ý: Không bind width ở constructor nữa để tránh lỗi chiều cao
 
-        // 2. Setup Button
+        // 2. Setup Footer (Nút ở góc dưới phải)
         translateBtn.getStyleClass().add("button-action");
-        translateBtn.setMaxWidth(Double.MAX_VALUE);
         translateBtn.setOnAction(e -> {
             if (getItem() != null) {
-                translateBtn.setDisable(true);
                 translateBtn.setText("Translating...");
+                translateBtn.setDisable(true);
                 onTranslateAction.accept(getItem());
             }
         });
+
+        footer.setAlignment(Pos.BOTTOM_RIGHT); // Căn phải
+        footer.setPadding(new Insets(5, 0, 0, 0)); // Cách biệt với nội dung trên
     }
 
     @Override
@@ -55,44 +52,44 @@ public class ParagraphTile extends ListCell<Paragraph> {
         if (empty || item == null) {
             setGraphic(null);
             setText(null);
+            // Gỡ bind để tránh leak memory
+            root.prefWidthProperty().unbind();
         } else {
+            // FIX LỖI CHIỀU CAO LỚN: Bind trực tiếp vào ListView cha
+            if (getListView() != null) {
+                // Trừ 40px: 15px padding trái + 15px padding phải + 10px scrollbar dư
+                root.prefWidthProperty().bind(getListView().widthProperty().subtract(40));
+                root.setMaxWidth(Region.USE_PREF_SIZE);
+            }
+
             root.getChildren().clear();
 
-            // 1. Header & Translate Button
-            HBox headerBox = new HBox();
-            headerBox.setAlignment(Pos.CENTER_RIGHT);
-
-            if (item.getTranslatedText() == null || item.getTranslatedText().isEmpty()) {
-                translateBtn.setText("Translate");
-                translateBtn.setDisable(false);
-                headerBox.getChildren().add(translateBtn);
-            }
-
-            if (!headerBox.getChildren().isEmpty()) {
-                root.getChildren().add(headerBox);
-            }
-
-            // 2. Original Text Section (Luôn hiện, Default Expanded)
+            // 1. Original Text Section
             originalSection = createCollapsibleSection("Original", item.getOriginalText(), "text-english", true);
             root.getChildren().add(originalSection);
 
-            // 3. Translated Text Section (Nếu có)
+            // 2. Translated Text Section (Nếu có)
             if (item.getTranslatedText() != null && !item.getTranslatedText().isEmpty()) {
                 translatedSection = createCollapsibleSection("Translation", item.getTranslatedText(), "text-vietnamese", true);
                 root.getChildren().add(translatedSection);
+
+                // Đã dịch xong -> Ẩn nút Translate (hoặc đổi thành Re-translate tuỳ logic)
+                // Ở đây tôi ẩn đi để giao diện sạch
+            } else {
+                // Chưa dịch -> Hiện nút Translate ở dưới cùng
+                translateBtn.setText("Translate Paragraph");
+                translateBtn.setDisable(false);
+                root.getChildren().add(footer);
             }
 
             setGraphic(root);
         }
     }
 
-    /**
-     * Helper tạo một section có thể collapse/expand
-     */
     private VBox createCollapsibleSection(String title, String text, String cssClass, boolean isExpanded) {
-        VBox section = new VBox(2);
+        VBox section = new VBox(4);
 
-        // Header (Clickable)
+        // Header
         Label header = new Label((isExpanded ? "▼ " : "▶ ") + title);
         header.getStyleClass().add("section-header");
         header.setMaxWidth(Double.MAX_VALUE);
@@ -102,15 +99,14 @@ public class ParagraphTile extends ListCell<Paragraph> {
         content.getStyleClass().add(cssClass);
         content.setWrapText(true);
 
-        // BINDING QUAN TRỌNG: Ép Label không được vượt quá chiều rộng của section cha
-        content.maxWidthProperty().bind(root.widthProperty().subtract(20)); // Trừ thêm padding nội bộ
-        content.setMinHeight(Region.USE_PREF_SIZE);
+        // Bind width của Label theo Root để wrap text đúng
+        content.prefWidthProperty().bind(root.widthProperty());
+        content.setMaxWidth(Region.USE_PREF_SIZE);
+        content.setMinHeight(Region.USE_PREF_SIZE); // Bắt buộc để tính toán chiều cao
 
-        // State control
         content.setManaged(isExpanded);
         content.setVisible(isExpanded);
 
-        // Click Event
         header.setOnMouseClicked(e -> {
             boolean newState = !content.isVisible();
             content.setVisible(newState);

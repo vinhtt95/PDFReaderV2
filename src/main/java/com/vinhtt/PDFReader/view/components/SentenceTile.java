@@ -2,32 +2,31 @@ package com.vinhtt.PDFReader.view.components;
 
 import com.vinhtt.PDFReader.model.Sentence;
 import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
-import javafx.scene.layout.FlowPane;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 
 import java.util.function.Consumer;
 
 public class SentenceTile extends ListCell<Sentence> {
-    private final VBox root = new VBox(5);
+    private final VBox root = new VBox(8);
     private final Button analyzeBtn = new Button("Analyze Grammar");
-    private final Button vocabBtn = new Button("Dictionary Lookup");
+    private final Button vocabBtn = new Button("Dictionary");
+    private final HBox footer = new HBox(10); // Footer chứa các nút
     private final Consumer<Sentence> onAnalyzeAction;
 
     public SentenceTile(Consumer<Sentence> onAnalyzeAction) {
         this.onAnalyzeAction = onAnalyzeAction;
 
+        // 1. Layout
         root.setPadding(new Insets(10));
         root.getStyleClass().add("card-view");
 
-        // Fix Wrap Text
-        root.prefWidthProperty().bind(this.widthProperty().subtract(30));
-        root.setMaxWidth(Region.USE_PREF_SIZE);
-
-        // Buttons style
+        // 2. Buttons Styling
         analyzeBtn.getStyleClass().add("button-action");
         vocabBtn.getStyleClass().add("button-action");
 
@@ -38,7 +37,10 @@ public class SentenceTile extends ListCell<Sentence> {
                 onAnalyzeAction.accept(getItem());
             }
         });
-        // TODO: Implement vocabBtn action
+
+        // 3. Setup Footer (Căn góc dưới phải)
+        footer.setAlignment(Pos.BOTTOM_RIGHT);
+        footer.setPadding(new Insets(5, 0, 0, 0));
     }
 
     @Override
@@ -47,28 +49,31 @@ public class SentenceTile extends ListCell<Sentence> {
 
         if (empty || item == null) {
             setGraphic(null);
+            root.prefWidthProperty().unbind();
         } else {
+            // FIX LỖI CHIỀU CAO: Bind vào ListView cha
+            if (getListView() != null) {
+                root.prefWidthProperty().bind(getListView().widthProperty().subtract(35));
+                root.setMaxWidth(Region.USE_PREF_SIZE);
+            }
+
             root.getChildren().clear();
 
-            // 1. Toolbar
-            FlowPane toolbar = new FlowPane(10, 10);
-            if (item.getAnalysis() == null || item.getAnalysis().isEmpty()) {
-                analyzeBtn.setText("Analyze Grammar");
-                analyzeBtn.setDisable(false);
-                toolbar.getChildren().add(analyzeBtn);
-            }
-            // toolbar.getChildren().add(vocabBtn); // Enable when ready
-
-            if (!toolbar.getChildren().isEmpty()) {
-                root.getChildren().add(toolbar);
-            }
-
-            // 2. Original Sentence (Expand by default)
+            // 1. Original Sentence
             root.getChildren().add(createCollapsibleSection("Sentence", item.getOriginal(), "text-english", true));
 
-            // 3. Analysis (If exists)
+            // 2. Analysis Result
             if (item.getAnalysis() != null && !item.getAnalysis().isEmpty()) {
                 root.getChildren().add(createCollapsibleSection("Grammar Analysis", item.getAnalysis(), "text-vietnamese", true));
+                // Đã phân tích xong -> Có thể ẩn nút hoặc hiện kết quả khác
+            } else {
+                // Chưa phân tích -> Hiện nút ở Footer
+                footer.getChildren().clear();
+                analyzeBtn.setText("Analyze Grammar");
+                analyzeBtn.setDisable(false);
+
+                footer.getChildren().addAll(analyzeBtn, vocabBtn);
+                root.getChildren().add(footer);
             }
 
             setGraphic(root);
@@ -84,7 +89,10 @@ public class SentenceTile extends ListCell<Sentence> {
         Label content = new Label(text);
         content.getStyleClass().add(cssClass);
         content.setWrapText(true);
-        content.maxWidthProperty().bind(root.widthProperty().subtract(20));
+
+        // Bind width
+        content.prefWidthProperty().bind(root.widthProperty());
+        content.setMaxWidth(Region.USE_PREF_SIZE);
         content.setMinHeight(Region.USE_PREF_SIZE);
 
         content.setManaged(isExpanded);
