@@ -1,0 +1,120 @@
+/* Global Colors & Fonts */
+.root {
+    -fx-background-color: #0d1117; /* Deep Black */
+    -fx-font-family: 'Segoe UI', 'Inter', sans-serif;
+    -color-bg-default: #0d1117;
+    -color-bg-surface: #161b22;
+    -color-border: #30363d;
+    -color-text-primary: #c9d1d9;
+    -color-text-secondary: #8b949e;
+    -color-accent: #58a6ff;
+    -color-accent-hover: #79c0ff;
+}
+
+/* ScrollPane & Containers */
+.scroll-pane, .scroll-pane > .viewport {
+    -fx-background-color: -color-bg-default;
+}
+.scroll-pane {
+    -fx-border-color: transparent;
+}
+
+.vbox-container {
+    -fx-background-color: -color-bg-default;
+    -fx-padding: 0;
+}
+
+/* SplitPane */
+.split-pane {
+    -fx-background-color: -color-bg-default;
+    -fx-padding: 0;
+}
+.split-pane > .split-pane-divider {
+    -fx-background-color: -color-bg-default;
+    -fx-padding: 0 1px; /* Thin divider */
+    -fx-border-color: -color-border;
+    -fx-border-width: 0 1px 0 0;
+}
+
+/* ListView General */
+.list-view {
+    -fx-background-color: -color-bg-default;
+    -fx-padding: 5px;
+}
+.list-cell {
+    -fx-background-color: transparent;
+    -fx-padding: 5px;
+    -fx-text-fill: -color-text-primary;
+}
+.list-cell:empty {
+    -fx-background-color: transparent;
+}
+
+/* Custom Cards (Paragraph & Sentence Tiles) */
+.card-view {
+    -fx-background-color: -color-bg-surface;
+    -fx-background-radius: 6px;
+    -fx-border-color: -color-border;
+    -fx-border-radius: 6px;
+    -fx-border-width: 1px;
+    -fx-effect: null; /* No shadow for flat design */
+}
+
+.list-cell:selected .card-view {
+    -fx-border-color: -color-accent;
+    -fx-border-width: 1px;
+    -fx-background-color: #1f2428; /* Slightly lighter on select */
+}
+
+/* Typography */
+.text-english {
+    -fx-fill: -color-text-primary;
+    -fx-font-size: 15px;
+    -fx-line-spacing: 3px;
+}
+
+.text-vietnamese {
+    -fx-fill: -color-text-secondary;
+    -fx-font-size: 14px;
+    -fx-font-style: italic;
+}
+
+.text-label-header {
+    -fx-text-fill: -color-accent;
+    -fx-font-weight: bold;
+    -fx-font-size: 12px;
+}
+
+/* Buttons */
+.button-action {
+    -fx-background-color: -color-bg-surface;
+    -fx-text-fill: -color-accent;
+    -fx-border-color: -color-border;
+    -fx-border-radius: 4px;
+    -fx-background-radius: 4px;
+    -fx-font-size: 11px;
+    -fx-cursor: hand;
+}
+.button-action:hover {
+    -fx-background-color: #30363d;
+    -fx-text-fill: -color-accent-hover;
+}
+
+/* Status Bar */
+.status-bar {
+    -fx-background-color: -color-bg-surface;
+    -fx-border-color: -color-border;
+    -fx-border-width: 1px 0 0 0;
+    -fx-padding: 4px 10px;
+}
+.status-label {
+    -fx-text-fill: -color-text-secondary;
+    -fx-font-size: 12px;
+}
+
+/* Separator Line */
+.separator-line {
+    -fx-border-color: -color-border;
+    -fx-border-width: 1px 0 0 0;
+    -fx-min-height: 1px;
+}

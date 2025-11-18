@@ -1,7 +1,9 @@
 package com.vinhtt.PDFReader.view;
 
 import com.vinhtt.PDFReader.model.Paragraph;
+import com.vinhtt.PDFReader.model.Sentence;
 import com.vinhtt.PDFReader.view.components.ParagraphTile;
+import com.vinhtt.PDFReader.view.components.SentenceTile; // Import mới
 import com.vinhtt.PDFReader.viewmodel.MainViewModel;
 import com.vinhtt.PDFReader.util.ConfigLoader;
 import javafx.fxml.FXML;
@@ -14,48 +16,51 @@ import javafx.stage.FileChooser;
 import javafx.collections.ListChangeListener;
 
 import java.io.File;
-import java.util.Optional;
 
 public class MainController {
 
     @FXML private ScrollPane pdfContainer;
-    @FXML private VBox pdfPageContainer; // Liên kết với FXML mới
+    @FXML private VBox pdfPageContainer;
     @FXML private ListView<Paragraph> paragraphListView;
-    @FXML private TextArea analysisArea;
+    @FXML private ListView<Sentence> sentenceListView; // Đổi từ TextArea sang ListView
     @FXML private Label statusLabel;
 
     private final MainViewModel viewModel = new MainViewModel();
 
     @FXML
     public void initialize() {
-        // 1. Bind Status
         statusLabel.textProperty().bind(viewModel.statusMessageProperty());
 
-        // 2. Setup Paragraph List
+        // --- CỘT 2: Paragraph List ---
         paragraphListView.setCellFactory(param -> new ParagraphTile(viewModel::translateParagraph));
         paragraphListView.itemsProperty().bind(viewModel.paragraphListProperty());
 
-        // 3. Selection Listener
+        // --- CỘT 3: Sentence List (MỚI) ---
+        sentenceListView.setCellFactory(param -> new SentenceTile(viewModel::analyzeSentence));
+        sentenceListView.itemsProperty().bind(viewModel.sentenceListProperty());
+
+        // --- Selection Logic ---
         paragraphListView.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
             viewModel.selectedParagraphProperty().set(newVal);
+            // Khi chọn đoạn văn, gọi ViewModel để tách câu
             if (newVal != null) {
-                analysisArea.setText("Original: " + newVal.getOriginalText());
+                viewModel.loadSentencesFor(newVal);
             }
         });
 
-        // 4. PDF Image Rendering Listener
+        // --- PDF Rendering ---
         viewModel.pdfPagesProperty().addListener((ListChangeListener<Image>) c -> {
             pdfPageContainer.getChildren().clear();
             for (Image img : c.getList()) {
                 ImageView imageView = new ImageView(img);
                 imageView.setPreserveRatio(true);
-                // Bind width để ảnh tự co giãn theo ScrollPane
                 imageView.fitWidthProperty().bind(pdfContainer.widthProperty().subtract(20));
                 pdfPageContainer.getChildren().add(imageView);
             }
         });
     }
 
+    // ... (Giữ nguyên các hàm onOpenPdf, onOpenSettings)
     public void onOpenPdf() {
         FileChooser fileChooser = new FileChooser();
         fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("PDF Files", "*.pdf"));
@@ -66,7 +71,6 @@ public class MainController {
     }
 
     public void onOpenSettings() {
-        // Tạo Dialog custom cho nhiều setting
         Dialog<ButtonType> dialog = new Dialog<>();
         dialog.setTitle("Settings");
         dialog.setHeaderText("Configuration");
@@ -99,7 +103,6 @@ public class MainController {
 
         dialog.getDialogPane().setContent(grid);
 
-        // Xử lý kết quả
         dialog.setResultConverter(dialogButton -> {
             if (dialogButton == saveButtonType) {
                 ConfigLoader.saveSettings(

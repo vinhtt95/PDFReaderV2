@@ -7,15 +7,14 @@
 <?import javafx.scene.control.MenuItem?>
 <?import javafx.scene.control.ScrollPane?>
 <?import javafx.scene.control.SplitPane?>
-<?import javafx.scene.control.TextArea?>
 <?import javafx.scene.layout.BorderPane?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.VBox?>
-<?import javafx.geometry.Insets?>
 
 <BorderPane xmlns="http://javafx.com/javafx/21"
             xmlns:fx="http://javafx.com/fxml/1"
-            fx:controller="com.vinhtt.PDFReader.view.MainController">
+            fx:controller="com.vinhtt.PDFReader.view.MainController"
+            stylesheets="@../styles.css">
 
     <top>
         <MenuBar BorderPane.alignment="CENTER">
@@ -34,29 +33,28 @@
     <center>
         <SplitPane dividerPositions="0.4, 0.7">
 
-            <VBox style="-fx-background-color: #0d1117;">
-                <ScrollPane fx:id="pdfContainer" fitToWidth="true" VBox.vgrow="ALWAYS"
-                            style="-fx-background: #0d1117; -fx-border-color: transparent;">
+            <VBox styleClass="vbox-container">
+                <ScrollPane fx:id="pdfContainer" fitToWidth="true" VBox.vgrow="ALWAYS">
                     <content>
-                        <VBox fx:id="pdfPageContainer" spacing="10" style="-fx-background-color: #0d1117; -fx-padding: 10;"/>
+                        <VBox fx:id="pdfPageContainer" spacing="10" style="-fx-padding: 10; -fx-background-color: #0d1117;"/>
                     </content>
                 </ScrollPane>
             </VBox>
 
-            <VBox>
-                <ListView fx:id="paragraphListView" VBox.vgrow="ALWAYS" style="-fx-background-color: #0d1117;"/>
+            <VBox styleClass="vbox-container">
+                <ListView fx:id="paragraphListView" VBox.vgrow="ALWAYS"/>
             </VBox>
 
-            <VBox>
-                <TextArea fx:id="analysisArea" wrapText="true" VBox.vgrow="ALWAYS" editable="false"/>
+            <VBox styleClass="vbox-container">
+                <ListView fx:id="sentenceListView" VBox.vgrow="ALWAYS"/>
             </VBox>
 
         </SplitPane>
     </center>
 
     <bottom>
-        <HBox style="-fx-background-color: #161b22; -fx-padding: 5; -fx-border-color: #30363d; -fx-border-width: 1 0 0 0;">
-            <Label fx:id="statusLabel" text="Ready" style="-fx-text-fill: #c9d1d9; -fx-font-size: 12px;"/>
+        <HBox styleClass="status-bar">
+            <Label fx:id="statusLabel" text="Ready" styleClass="status-label"/>
         </HBox>
     </bottom>
 
