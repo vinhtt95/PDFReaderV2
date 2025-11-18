@@ -8,7 +8,7 @@ import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Region;
-import javafx.scene.layout.StackPane; // Import mới
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.web.WebView;
 import com.vladsch.flexmark.html.HtmlRenderer;
@@ -22,6 +22,9 @@ public class SentenceTile extends ListCell<Sentence> {
     private final Button vocabBtn = new Button("Dictionary");
     private final HBox footer = new HBox(10);
     private final Consumer<Sentence> onAnalyzeAction;
+
+    // Định nghĩa chiều cao cố định cho khung Analysis để tránh lỗi layout 0px
+    private static final double ANALYSIS_HEIGHT = 300.0;
 
     public SentenceTile(Consumer<Sentence> onAnalyzeAction) {
         this.onAnalyzeAction = onAnalyzeAction;
@@ -45,17 +48,35 @@ public class SentenceTile extends ListCell<Sentence> {
     }
 
     private String renderMarkdownToHtml(String markdown) {
+        if (markdown == null) return "";
+
         Parser parser = Parser.builder().build();
         HtmlRenderer renderer = HtmlRenderer.builder().build();
         String htmlContent = renderer.render(parser.parse(markdown));
 
-        // Inject CSS để match với Dark Theme
+        // CSS: Đảm bảo background và màu chữ tương phản rõ rệt
         return "<html><head><style>" +
-                "body { background-color: #161b22; color: #c9d1d9; font-family: 'Segoe UI', sans-serif; font-size: 14px; margin: 0; padding: 0; }" +
-                "strong { color: #58a6ff; }" +
-                "code { background-color: #30363d; padding: 2px 4px; border-radius: 4px; font-family: monospace; }" +
-                "ul { padding-left: 20px; }" +
-                "p { margin-top: 5px; margin-bottom: 5px; }" +
+                "body { " +
+                "   background-color: #161b22; " +
+                "   color: #c9d1d9; " +
+                "   font-family: 'Segoe UI', sans-serif; " +
+                "   font-size: 14px; " +
+                "   line-height: 1.6; " +
+                "   margin: 0; " +
+                "   padding: 10px; " + // Thêm padding để chữ không sát lề
+                "   overflow-x: hidden; " +
+                "} " +
+                "strong { color: #58a6ff; font-weight: bold; } " +
+                "code { " +
+                "   background-color: #30363d; " +
+                "   padding: 2px 5px; " +
+                "   border-radius: 4px; " +
+                "   font-family: 'Consolas', monospace; " +
+                "   color: #ff7b72; " +
+                "} " +
+                "ul, ol { padding-left: 20px; margin: 5px 0; } " +
+                "li { margin-bottom: 4px; } " +
+                "p { margin: 5px 0; } " +
                 "</style></head><body>" +
                 htmlContent +
                 "</body></html>";
@@ -69,6 +90,7 @@ public class SentenceTile extends ListCell<Sentence> {
             setGraphic(null);
             root.prefWidthProperty().unbind();
         } else {
+            // Binding chiều rộng của root theo ListView
             if (getListView() != null) {
                 root.prefWidthProperty().bind(getListView().widthProperty().subtract(45));
                 root.setMaxWidth(Region.USE_PREF_SIZE);
@@ -76,14 +98,14 @@ public class SentenceTile extends ListCell<Sentence> {
 
             root.getChildren().clear();
 
-            // 1. Sentence
+            // 1. Câu gốc
             root.getChildren().add(createCollapsibleSection("Sentence", item.getOriginal(), false, true));
 
-            // 2. Analysis
+            // 2. Phân tích (Markdown / WebView)
             if (item.getAnalysis() != null && !item.getAnalysis().isEmpty()) {
                 root.getChildren().add(createCollapsibleSection("Grammar Analysis", item.getAnalysis(), true, true));
             } else {
-                // Toolbar
+                // Toolbar Buttons
                 footer.getChildren().clear();
                 analyzeBtn.setText("Analyze Grammar");
                 analyzeBtn.setDisable(false);
@@ -96,7 +118,7 @@ public class SentenceTile extends ListCell<Sentence> {
     }
 
     private VBox createCollapsibleSection(String title, String text, boolean isMarkdown, boolean isExpanded) {
-        VBox section = new VBox(2);
+        VBox section = new VBox(5);
         Label header = new Label((isExpanded ? "▼ " : "▶ ") + title);
         header.getStyleClass().add("section-header");
         header.setMaxWidth(Double.MAX_VALUE);
@@ -105,24 +127,42 @@ public class SentenceTile extends ListCell<Sentence> {
 
         if (isMarkdown) {
             WebView webView = new WebView();
-            webView.getEngine().loadContent(renderMarkdownToHtml(text));
-            webView.setPageFill(javafx.scene.paint.Color.TRANSPARENT);
             webView.setContextMenuEnabled(false);
-            webView.setPrefHeight(300);
+            webView.setPageFill(javafx.scene.paint.Color.TRANSPARENT); // Quan trọng: nền trong suốt để thấy màu background body HTML
+            webView.getEngine().loadContent(renderMarkdownToHtml(text));
 
-            // FIX: Bọc WebView trong StackPane (StackPane là một Region)
+            // --- FIX QUAN TRỌNG: ÉP KÍCH THƯỚC ---
+            // WebView trong ListCell cực kỳ dễ bị lỗi kích thước 0.
+            // Ta phải ép MinHeight và PrefHeight.
+            webView.setMinHeight(ANALYSIS_HEIGHT);
+            webView.setPrefHeight(ANALYSIS_HEIGHT);
+            webView.setMaxHeight(ANALYSIS_HEIGHT);
+
+            // Ép MinWidth để tránh bị bóp nghẹt chiều ngang
+            webView.setMinWidth(200);
+
             StackPane wrapper = new StackPane(webView);
+            // Wrapper cũng phải ép chiều cao theo WebView
+            wrapper.setMinHeight(ANALYSIS_HEIGHT);
+            wrapper.setPrefHeight(ANALYSIS_HEIGHT);
+
+            // Style border cho đẹp (tùy chọn)
+            wrapper.setStyle("-fx-border-color: #30363d; -fx-border-width: 1px; -fx-border-radius: 4px;");
+
+            // Binding Width: WebView phải fill theo Wrapper
+            webView.prefWidthProperty().bind(wrapper.widthProperty());
+
             content = wrapper;
         } else {
             Label label = new Label(text);
             label.getStyleClass().add("text-english");
             label.setWrapText(true);
+            label.setMaxWidth(Region.USE_PREF_SIZE);
             content = label;
         }
 
-        // Binding chung cho Region (Giờ StackPane sẽ nhận binding này)
+        // Binding Width chung cho Section Content
         content.prefWidthProperty().bind(root.widthProperty());
-        content.setMaxWidth(Region.USE_PREF_SIZE);
 
         content.setManaged(isExpanded);
         content.setVisible(isExpanded);
