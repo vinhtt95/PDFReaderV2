@@ -3,12 +3,13 @@ package com.vinhtt.PDFReader.service.pdf;
 import com.vinhtt.PDFReader.model.Paragraph;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.rendering.PDFRenderer; // Cần import
 import org.apache.pdfbox.text.PDFTextStripper;
 import org.apache.pdfbox.text.TextPosition;
 
+import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
-import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -28,12 +29,24 @@ public class PdfBoxService implements IPdfService {
     }
 
     @Override
+    public List<BufferedImage> renderPdfPages(File file) throws Exception {
+        List<BufferedImage> images = new ArrayList<>();
+        try (PDDocument document = Loader.loadPDF(file)) {
+            PDFRenderer renderer = new PDFRenderer(document);
+            for (int i = 0; i < document.getNumberOfPages(); i++) {
+                // Scale 1.5f ~ 108 DPI (Good for reading)
+                images.add(renderer.renderImage(i, 1.5f));
+            }
+        }
+        return images;
+    }
+
+    @Override
     public String calculateFileHash(File file) {
-        // Simplified hash logic for demo
         return file.getName() + "_" + file.length();
     }
 
-    // Inner class to handle text extraction logic
+    // Inner class CustomPDFTextStripper (giữ nguyên như cũ)
     private static class CustomPDFTextStripper extends PDFTextStripper {
         private final List<Paragraph> outputList;
         private StringBuilder currentParagraph = new StringBuilder();
@@ -47,14 +60,10 @@ public class PdfBoxService implements IPdfService {
         @Override
         protected void writeString(String text, List<TextPosition> textPositions) throws IOException {
             if (textPositions.isEmpty()) return;
-
             float y = textPositions.get(0).getY();
-
-            // Simple logic: if Y distance is large, treat as new paragraph
             if (Math.abs(y - currentY) > 20 && currentParagraph.length() > 0) {
                 saveParagraph();
             }
-
             currentParagraph.append(text).append(" ");
             currentY = y;
         }
@@ -67,7 +76,6 @@ public class PdfBoxService implements IPdfService {
             currentParagraph.setLength(0);
         }
 
-        // Flush remaining text at end of page
         @Override
         protected void writePage() throws IOException {
             super.writePage();

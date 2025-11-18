@@ -12,13 +12,18 @@ import javafx.beans.property.*;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.concurrent.Task;
+import javafx.embed.swing.SwingFXUtils;
+import javafx.scene.image.Image;
 
+import java.awt.image.BufferedImage;
 import java.io.File;
+import java.util.ArrayList;
 import java.util.List;
 
 public class MainViewModel {
-    // Properties bound to View
+    // Properties
     private final ListProperty<Paragraph> paragraphList = new SimpleListProperty<>(FXCollections.observableArrayList());
+    private final ListProperty<Image> pdfPages = new SimpleListProperty<>(FXCollections.observableArrayList()); // Chứa ảnh PDF
     private final ObjectProperty<Paragraph> selectedParagraph = new SimpleObjectProperty<>();
     private final StringProperty statusMessage = new SimpleStringProperty("Ready");
 
@@ -34,29 +39,37 @@ public class MainViewModel {
     }
 
     public void loadPdf(File file) {
-        statusMessage.set("Loading PDF...");
-        Task<List<Paragraph>> task = new Task<>() {
+        statusMessage.set("Analyzing PDF & Rendering...");
+
+        Task<Void> task = new Task<>() {
             @Override
-            protected List<Paragraph> call() throws Exception {
-                // 1. Parse PDF
+            protected Void call() throws Exception {
+                // 1. Parse Text
                 List<Paragraph> paragraphs = pdfService.parsePdf(file);
 
-                // 2. Init DB and Cache (Simple logic)
+                // 2. Render Images
+                List<BufferedImage> bufferedImages = pdfService.renderPdfPages(file);
+                List<Image> fxImages = new ArrayList<>();
+                for (BufferedImage bi : bufferedImages) {
+                    fxImages.add(SwingFXUtils.toFXImage(bi, null));
+                }
+
+                // 3. Update UI Data
+                Platform.runLater(() -> {
+                    paragraphList.setAll(paragraphs);
+                    pdfPages.setAll(fxImages);
+                });
+
+                // 4. DB Init (Background)
                 String dbPath = file.getParent() + File.separator + file.getName() + ".meta.db";
                 storageService.initDatabase(dbPath);
-                // storageService.saveParagraphs(paragraphs); // Uncomment to enable save
-
-                return paragraphs;
+                return null;
             }
         };
 
-        task.setOnSucceeded(e -> {
-            paragraphList.setAll(task.getValue());
-            statusMessage.set("PDF Loaded: " + file.getName());
-        });
-
+        task.setOnSucceeded(e -> statusMessage.set("File loaded: " + file.getName()));
         task.setOnFailed(e -> {
-            statusMessage.set("Error loading PDF");
+            statusMessage.set("Error: " + task.getException().getMessage());
             task.getException().printStackTrace();
         });
 
@@ -64,15 +77,12 @@ public class MainViewModel {
     }
 
     public void translateParagraph(Paragraph p) {
-        statusMessage.set("Translating...");
+        statusMessage.set("Translating ID " + p.hashCode() + "...");
         translationService.translate(p.getOriginalText())
                 .thenAccept(translated -> Platform.runLater(() -> {
                     p.setTranslatedText(translated);
-                    // Refresh list view item logic usually handled by property extractor or force refresh
                     int index = paragraphList.indexOf(p);
-                    if (index >= 0) {
-                        paragraphList.set(index, p); // Trigger update
-                    }
+                    if (index >= 0) paragraphList.set(index, p);
                     statusMessage.set("Translation complete.");
                 }))
                 .exceptionally(ex -> {
@@ -81,9 +91,11 @@ public class MainViewModel {
                 });
     }
 
-    // Getters for properties
+    // Getters
     public ObservableList<Paragraph> getParagraphList() { return paragraphList.get(); }
     public ListProperty<Paragraph> paragraphListProperty() { return paragraphList; }
+    public ObservableList<Image> getPdfPages() { return pdfPages.get(); }
+    public ListProperty<Image> pdfPagesProperty() { return pdfPages; }
 
     public ObjectProperty<Paragraph> selectedParagraphProperty() { return selectedParagraph; }
     public StringProperty statusMessageProperty() { return statusMessage; }

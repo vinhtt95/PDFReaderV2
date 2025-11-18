@@ -11,7 +11,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
 public class GeminiService implements ITranslationService {
-    private static final String API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent";
+    // Base URL không chứa tên model cứng
+    private static final String BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models/";
     private final OkHttpClient client;
 
     public GeminiService() {
@@ -23,9 +24,14 @@ public class GeminiService implements ITranslationService {
 
     private CompletableFuture<String> callGemini(String prompt) {
         String apiKey = ConfigLoader.getApiKey();
+        String model = ConfigLoader.getGeminiModel(); // Lấy model từ setting
+
         if (apiKey.isEmpty()) {
-            return CompletableFuture.failedFuture(new RuntimeException("API Key not found. Please set it in Settings."));
+            return CompletableFuture.failedFuture(new RuntimeException("API Key not found. Check Settings."));
         }
+
+        // Construct URL: .../models/{model}:generateContent
+        String fullUrl = BASE_URL + model + ":generateContent?key=" + apiKey;
 
         JsonObject jsonBody = new JsonObject();
         JsonArray contents = new JsonArray();
@@ -41,7 +47,7 @@ public class GeminiService implements ITranslationService {
 
         RequestBody body = RequestBody.create(jsonBody.toString(), MediaType.get("application/json"));
         Request request = new Request.Builder()
-                .url(API_URL + "?key=" + apiKey)
+                .url(fullUrl)
                 .post(body)
                 .build();
 
@@ -57,22 +63,28 @@ public class GeminiService implements ITranslationService {
             public void onResponse(Call call, Response response) throws IOException {
                 try (ResponseBody responseBody = response.body()) {
                     if (!response.isSuccessful()) {
-                        future.completeExceptionally(new IOException("API Error: " + response.code()));
+                        String err = responseBody != null ? responseBody.string() : "Unknown Error";
+                        future.completeExceptionally(new IOException("API Error (" + response.code() + "): " + err));
                         return;
                     }
+
                     String respStr = responseBody.string();
-                    // Parse JSON response from Gemini to get the text
-                    JsonObject jsonResp = JsonParser.parseString(respStr).getAsJsonObject();
                     try {
-                        String resultText = jsonResp.getAsJsonArray("candidates")
-                                .get(0).getAsJsonObject()
-                                .getAsJsonObject("content")
-                                .getAsJsonArray("parts")
-                                .get(0).getAsJsonObject()
-                                .get("text").getAsString();
-                        future.complete(resultText);
+                        JsonObject jsonResp = JsonParser.parseString(respStr).getAsJsonObject();
+                        // Handle case where response might be blocked or empty
+                        if (jsonResp.has("candidates") && jsonResp.getAsJsonArray("candidates").size() > 0) {
+                            String resultText = jsonResp.getAsJsonArray("candidates")
+                                    .get(0).getAsJsonObject()
+                                    .getAsJsonObject("content")
+                                    .getAsJsonArray("parts")
+                                    .get(0).getAsJsonObject()
+                                    .get("text").getAsString();
+                            future.complete(resultText);
+                        } else {
+                            future.completeExceptionally(new RuntimeException("No content returned (Safety block?)"));
+                        }
                     } catch (Exception e) {
-                        future.completeExceptionally(new RuntimeException("Failed to parse Gemini response"));
+                        future.completeExceptionally(new RuntimeException("Parse Error: " + e.getMessage()));
                     }
                 }
             }
@@ -83,11 +95,13 @@ public class GeminiService implements ITranslationService {
 
     @Override
     public CompletableFuture<String> translate(String text) {
-        return callGemini("Translate the following text to Vietnamese. Only provide the translated text, no explanations:\n\n" + text);
+        // Lấy prompt từ setting
+        String customPrompt = ConfigLoader.getTranslationPrompt();
+        return callGemini(customPrompt + "\n\n" + text);
     }
 
     @Override
     public CompletableFuture<String> analyze(String text) {
-        return callGemini("Analyze the grammar of the following English sentence. Identify Subject, Verb, Object and Tense. Return format as JSON:\n\n" + text);
+        return callGemini("Analyze grammar (S-V-O, Tense) for: \n\n" + text);
     }
 }
