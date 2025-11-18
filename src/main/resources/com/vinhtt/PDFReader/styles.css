@@ -69,14 +69,15 @@
     -fx-font-size: 1em;
     -fx-line-spacing: 0.5em;
     -fx-text-alignment: justify;
+    -fx-padding: 10 0 0 0;
 }
 
 .text-vietnamese {
     -fx-fill: -color-text-secondary;
-    -fx-font-size: 0.95em;
-    -fx-font-style: italic;
+    -fx-font-size: 1.05em;
     -fx-line-spacing: 0.5em;
     -fx-text-alignment: justify;
+    -fx-padding: 10 0 0 0;
 }
 
 .text-label-header {
